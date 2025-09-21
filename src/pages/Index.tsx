@@ -3,11 +3,23 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Icon from '@/components/ui/icon';
 
 const Index = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [activeSection, setActiveSection] = useState('home');
+  const [bookingOpen, setBookingOpen] = useState(false);
+  const [selectedTeacher, setSelectedTeacher] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState('');
+  const [selectedTime, setSelectedTime] = useState('');
+  const [studentName, setStudentName] = useState('');
+  const [studentPhone, setStudentPhone] = useState('');
+  const [studentEmail, setStudentEmail] = useState('');
 
   const scrollToSection = (sectionId: string) => {
     setActiveSection(sectionId);
@@ -87,6 +99,42 @@ const Index = () => {
     { time: '17:00', subject: 'Обществознание', teacher: 'И.С. Новиков', room: '102' }
   ];
 
+  const availableSlots = [
+    { time: '9:00', available: true },
+    { time: '11:00', available: true },
+    { time: '13:00', available: false },
+    { time: '15:00', available: true },
+    { time: '17:00', available: true },
+    { time: '19:00', available: true }
+  ];
+
+  const handleBooking = () => {
+    if (!selectedTeacher || !selectedSubject || !selectedTime || !studentName || !studentPhone) {
+      alert('Пожалуйста, заполните все обязательные поля');
+      return;
+    }
+    alert(`Заявка отправлена!
+Преподаватель: ${selectedTeacher}
+Предмет: ${selectedSubject}
+Время: ${selectedTime}
+Ученик: ${studentName}
+
+Мы свяжемся с вами в ближайшее время!`);
+    setBookingOpen(false);
+    setSelectedTeacher('');
+    setSelectedSubject('');
+    setSelectedTime('');
+    setStudentName('');
+    setStudentPhone('');
+    setStudentEmail('');
+  };
+
+  const openBookingModal = (teacher?: string, subject?: string) => {
+    if (teacher) setSelectedTeacher(teacher);
+    if (subject) setSelectedSubject(subject);
+    setBookingOpen(true);
+  };
+
   return (
     <div className="min-h-screen bg-background font-sans">
       {/* Navigation */}
@@ -111,7 +159,11 @@ const Index = () => {
                 </button>
               ))}
             </div>
-            <Button className="hidden md:block">Записаться</Button>
+            <Dialog open={bookingOpen} onOpenChange={setBookingOpen}>
+              <DialogTrigger asChild>
+                <Button className="hidden md:block">Записаться</Button>
+              </DialogTrigger>
+            </Dialog>
           </div>
         </div>
       </nav>
@@ -129,11 +181,11 @@ const Index = () => {
                 Помогаем достичь высоких результатов и поступить в желаемый вуз.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 mb-8">
-                <Button size="lg" className="text-lg px-8">
+                <Button size="lg" className="text-lg px-8" onClick={() => openBookingModal()}>
                   <Icon name="BookOpen" size={20} className="mr-2" />
                   Начать обучение
                 </Button>
-                <Button variant="outline" size="lg" className="text-lg px-8">
+                <Button variant="outline" size="lg" className="text-lg px-8" onClick={() => openBookingModal()}>
                   <Icon name="Phone" size={20} className="mr-2" />
                   Консультация
                 </Button>
@@ -269,7 +321,7 @@ const Index = () => {
                     </div>
                     <span className="text-sm text-muted-foreground">{teacher.students} учеников</span>
                   </div>
-                  <Button variant="outline" className="w-full">Записаться</Button>
+                  <Button variant="outline" className="w-full" onClick={() => openBookingModal(teacher.name, teacher.subject)}>Записаться</Button>
                 </CardContent>
               </Card>
             ))}
@@ -428,6 +480,133 @@ const Index = () => {
           </div>
         </div>
       </footer>
+
+      {/* Booking Modal */}
+      <Dialog open={bookingOpen} onOpenChange={setBookingOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-heading">Записаться на занятие</DialogTitle>
+            <DialogDescription>
+              Выберите преподавателя, предмет и удобное время для занятий
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Tabs defaultValue="info" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="info">Информация о занятии</TabsTrigger>
+              <TabsTrigger value="student">Данные ученика</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="info" className="space-y-4">
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="teacher">Преподаватель *</Label>
+                  <Select value={selectedTeacher} onValueChange={setSelectedTeacher}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Выберите преподавателя" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {teachers.map((teacher, index) => (
+                        <SelectItem key={index} value={teacher.name}>
+                          {teacher.name} - {teacher.subject}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="subject">Предмет *</Label>
+                  <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Выберите предмет" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subjects.map((subject, index) => (
+                        <SelectItem key={index} value={subject.name}>
+                          {subject.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="time">Время занятия *</Label>
+                  <div className="grid grid-cols-3 gap-2 mt-2">
+                    {availableSlots.map((slot, index) => (
+                      <Button
+                        key={index}
+                        variant={selectedTime === slot.time ? "default" : "outline"}
+                        disabled={!slot.available}
+                        onClick={() => setSelectedTime(slot.time)}
+                        className="h-12"
+                      >
+                        {slot.time}
+                        {!slot.available && <span className="ml-1 text-xs">(занято)</span>}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="student" className="space-y-4">
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="name">Имя ученика *</Label>
+                  <Input
+                    id="name"
+                    value={studentName}
+                    onChange={(e) => setStudentName(e.target.value)}
+                    placeholder="Введите имя ученика"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="phone">Телефон *</Label>
+                  <Input
+                    id="phone"
+                    value={studentPhone}
+                    onChange={(e) => setStudentPhone(e.target.value)}
+                    placeholder="+7 (___) ___-__-__"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="email">Email (необязательно)</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={studentEmail}
+                    onChange={(e) => setStudentEmail(e.target.value)}
+                    placeholder="example@mail.ru"
+                  />
+                </div>
+
+                <div className="bg-muted/50 p-4 rounded-lg">
+                  <h4 className="font-semibold mb-2">Выбранные параметры:</h4>
+                  <div className="space-y-1 text-sm">
+                    <p>Преподаватель: {selectedTeacher || 'Не выбран'}</p>
+                    <p>Предмет: {selectedSubject || 'Не выбран'}</p>
+                    <p>Время: {selectedTime || 'Не выбрано'}</p>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <div className="flex gap-3 mt-6">
+            <Button variant="outline" onClick={() => setBookingOpen(false)} className="flex-1">
+              Отмена
+            </Button>
+            <Button onClick={handleBooking} className="flex-1">
+              <Icon name="Calendar" size={16} className="mr-2" />
+              Записаться
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
