@@ -37,32 +37,7 @@ const Index = () => {
     { name: "Биология", color: "bg-accent", students: 35 },
   ];
 
-  const teachers = [
-    {
-      name: "Я внатуре отморозок жес",
-      subject: "Математика",
-      experience: "15 лет",
-      rating: 4.9,
-      students: 120,
-      image: "/img/7a073bd2-7f17-418a-8b5a-6b500641d169.jpg",
-    },
-    {
-      name: "я тоже вацок",
-      subject: "Физика",
-      experience: "12 лет",
-      rating: 4.8,
-      students: 95,
-      image: "/img/7a073bd2-7f17-418a-8b5a-6b500641d169.jpg",
-    },
-    {
-      name: "рот закрой да по братски",
-      subject: "Русский язык",
-      experience: "18 лет",
-      rating: 4.9,
-      students: 110,
-      image: "/img/7a073bd2-7f17-418a-8b5a-6b500641d169.jpg",
-    },
-  ];
+  const teachers: any[] = [];
 
   const results = [
     { exam: "ЕГЭ Математика", averageScore: 87, successRate: 94 },
@@ -92,38 +67,7 @@ const Index = () => {
     },
   ];
 
-  const schedule = [
-    {
-      time: "9:00",
-      subject: "Математика (ЕГЭ)",
-      teacher: "А.П. Смирнова",
-      room: "201",
-    },
-    {
-      time: "11:00",
-      subject: "Русский язык (ОГЭ)",
-      teacher: "Е.В. Зайцева",
-      room: "105",
-    },
-    {
-      time: "13:00",
-      subject: "Физика (ЕГЭ)",
-      teacher: "М.А. Козлов",
-      room: "301",
-    },
-    {
-      time: "15:00",
-      subject: "Математика (ОГЭ)",
-      teacher: "А.П. Смирнова",
-      room: "201",
-    },
-    {
-      time: "17:00",
-      subject: "Обществознание",
-      teacher: "И.С. Новиков",
-      room: "102",
-    },
-  ];
+  const schedule: any[] = [];
 
   const availableSlots = [
     { time: "9:00", available: true },
@@ -134,7 +78,7 @@ const Index = () => {
     { time: "19:00", available: true },
   ];
 
-  const handleBooking = () => {
+  const handleBooking = async () => {
     if (
       !selectedTeacher ||
       !selectedSubject ||
@@ -145,20 +89,48 @@ const Index = () => {
       alert("Пожалуйста, заполните все обязательные поля");
       return;
     }
-    alert(`Заявка отправлена!
+
+    try {
+      const response = await fetch(
+        "https://functions.poehali.dev/98346566-b607-4709-8500-51e601b9d6e9",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            student_name: studentName,
+            student_phone: studentPhone,
+            student_email: studentEmail,
+            selected_teacher: selectedTeacher,
+            selected_subject: selectedSubject,
+            selected_time: selectedTime,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        alert(`Заявка отправлена!
 Преподаватель: ${selectedTeacher}
 Предмет: ${selectedSubject}
 Время: ${selectedTime}
 Ученик: ${studentName}
 
 Мы свяжемся с вами в ближайшее время!`);
-    setBookingOpen(false);
-    setSelectedTeacher("");
-    setSelectedSubject("");
-    setSelectedTime("");
-    setStudentName("");
-    setStudentPhone("");
-    setStudentEmail("");
+        setBookingOpen(false);
+        setSelectedTeacher("");
+        setSelectedSubject("");
+        setSelectedTime("");
+        setStudentName("");
+        setStudentPhone("");
+        setStudentEmail("");
+      } else {
+        alert("Ошибка при отправке заявки. Попробуйте позже.");
+      }
+    } catch (error) {
+      alert("Ошибка при отправке заявки. Попробуйте позже.");
+      console.error("Booking error:", error);
+    }
   };
 
   const openBookingModal = (teacher?: string, subject?: string) => {

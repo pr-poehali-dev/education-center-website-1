@@ -25,6 +25,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     - /contacts - контакты
     - /reviews - отзывы
     - /results - результаты
+    - /bookings - заявки учеников
     '''
     method: str = event.get('httpMethod', 'GET')
     path_params = event.get('pathParams', {})
@@ -146,14 +147,18 @@ def get_entities(cur, entity: str) -> List[Dict]:
         'calendar': 'calendar_events',
         'contacts': 'contacts',
         'reviews': 'reviews',
-        'results': 'results'
+        'results': 'results',
+        'bookings': 'student_bookings'
     }
     
     table = table_map.get(entity)
     if not table:
         raise ValueError(f'Unknown entity: {entity}')
     
-    query = f"SELECT * FROM t_p90313977_education_center_web.{table} ORDER BY sort_order, id"
+    if entity == 'bookings':
+        query = f"SELECT * FROM t_p90313977_education_center_web.{table} ORDER BY created_at DESC"
+    else:
+        query = f"SELECT * FROM t_p90313977_education_center_web.{table} ORDER BY sort_order, id"
     cur.execute(query)
     columns = [desc[0] for desc in cur.description]
     rows = cur.fetchall()
@@ -178,7 +183,8 @@ def get_entity_by_id(cur, entity: str, entity_id: str) -> Dict:
         'calendar': 'calendar_events',
         'contacts': 'contacts',
         'reviews': 'reviews',
-        'results': 'results'
+        'results': 'results',
+        'bookings': 'student_bookings'
     }
     
     table = table_map.get(entity)
@@ -208,7 +214,8 @@ def create_entity(cur, conn, entity: str, data: Dict) -> Dict:
         'calendar': ('calendar_events', ['date', 'title', 'description', 'event_type', 'sort_order']),
         'contacts': ('contacts', ['type', 'value', 'icon', 'label', 'sort_order']),
         'reviews': ('reviews', ['author_name', 'author_photo', 'rating', 'review_text', 'date', 'is_published', 'sort_order']),
-        'results': ('results', ['title', 'description', 'image_url', 'metric_value', 'metric_label', 'sort_order'])
+        'results': ('results', ['title', 'description', 'image_url', 'metric_value', 'metric_label', 'sort_order']),
+        'bookings': ('student_bookings', ['student_name', 'student_phone', 'student_email', 'selected_teacher', 'selected_subject', 'selected_time', 'status'])
     }
     
     table_info = table_map.get(entity)
@@ -237,7 +244,8 @@ def update_entity(cur, conn, entity: str, entity_id: str, data: Dict) -> Dict:
         'calendar': ('calendar_events', ['date', 'title', 'description', 'event_type', 'sort_order']),
         'contacts': ('contacts', ['type', 'value', 'icon', 'label', 'sort_order']),
         'reviews': ('reviews', ['author_name', 'author_photo', 'rating', 'review_text', 'date', 'is_published', 'sort_order']),
-        'results': ('results', ['title', 'description', 'image_url', 'metric_value', 'metric_label', 'sort_order'])
+        'results': ('results', ['title', 'description', 'image_url', 'metric_value', 'metric_label', 'sort_order']),
+        'bookings': ('student_bookings', ['student_name', 'student_phone', 'student_email', 'selected_teacher', 'selected_subject', 'selected_time', 'status'])
     }
     
     table_info = table_map.get(entity)

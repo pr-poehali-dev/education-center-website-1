@@ -1,0 +1,36 @@
+{
+  "tests": [
+    {
+      "name": "Submit booking with valid data",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "student_name": "Иван Иванов",
+        "student_phone": "+7 999 123 45 67",
+        "student_email": "ivan@example.com",
+        "selected_teacher": "А.П. Смирнова",
+        "selected_subject": "Математика",
+        "selected_time": "10:00"
+      },
+      "expectedStatus": 201,
+      "expectedBody": {
+        "success": true,
+        "booking_id": "number"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Submit booking without required fields",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "student_email": "test@example.com"
+      },
+      "expectedStatus": 400,
+      "expectedBody": {
+        "error": "string"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}
