@@ -1,0 +1,25 @@
+{
+  "tests": [
+    {
+      "name": "Get teachers list",
+      "method": "GET",
+      "path": "/?entity=teachers",
+      "headers": {
+        "X-Auth-Token": "admin_1_shafi"
+      },
+      "expectedStatus": 200,
+      "expectedBody": [],
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Unauthorized access",
+      "method": "GET",
+      "path": "/?entity=teachers",
+      "expectedStatus": 401,
+      "expectedBody": {
+        "error": "string"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}
