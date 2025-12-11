@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -37,7 +37,46 @@ const Index = () => {
     { name: "Биология", color: "bg-accent", students: 35 },
   ];
 
-  const teachers: any[] = [];
+  const [teachers, setTeachers] = useState<any[]>([]);
+  const [schedule, setSchedule] = useState<any[]>([]);
+  const [contacts, setContacts] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<any[]>([]);
+
+  const API_URL = 'https://functions.poehali.dev/3fe1afdd-d3fa-410a-8629-ad0d3e8996fe';
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const [teachersRes, scheduleRes, contactsRes, reviewsRes] = await Promise.all([
+        fetch(`${API_URL}?entity=teachers`),
+        fetch(`${API_URL}?entity=schedule`),
+        fetch(`${API_URL}?entity=contacts`),
+        fetch(`${API_URL}?entity=reviews`)
+      ]);
+      
+      if (teachersRes.ok) {
+        const data = await teachersRes.json();
+        setTeachers(data);
+      }
+      if (scheduleRes.ok) {
+        const data = await scheduleRes.json();
+        setSchedule(data);
+      }
+      if (contactsRes.ok) {
+        const data = await contactsRes.json();
+        setContacts(data);
+      }
+      if (reviewsRes.ok) {
+        const data = await reviewsRes.json();
+        setReviews(data);
+      }
+    } catch (error) {
+      console.error('Error loading data:', error);
+    }
+  };
 
   const results = [
     { exam: "ЕГЭ Математика", averageScore: 87, successRate: 94 },
@@ -46,28 +85,12 @@ const Index = () => {
     { exam: "ОГЭ Математика", averageScore: 4.4, successRate: 92 },
   ];
 
-  const testimonials = [
-    {
-      name: "Мария Иванова",
-      text: "Благодаря занятиям в центре сдала ЕГЭ по математике на 95 баллов! Преподаватели объясняют сложные темы простым языком.",
-      score: 95,
-      subject: "Математика",
-    },
-    {
-      name: "Дмитрий Петров",
-      text: "Отличная подготовка к ОГЭ. Систематизировал знания и повысил уверенность в себе. Рекомендую!",
-      score: 5,
-      subject: "Русский язык",
-    },
-    {
-      name: "Анастасия Волкова",
-      text: "Поступила в МГУ благодаря качественной подготовке. Спасибо преподавателям за терпение и профессионализм!",
-      score: 89,
-      subject: "Физика",
-    },
-  ];
-
-  const schedule: any[] = [];
+  const testimonials = reviews.map(review => ({
+    name: review.author_name || '',
+    text: review.review_text || '',
+    score: review.rating || 5,
+    subject: '',
+  }));
 
   const availableSlots = [
     { time: "9:00", available: true },

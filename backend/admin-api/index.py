@@ -1,6 +1,7 @@
 import json
 import os
 import psycopg2
+from decimal import Decimal
 from typing import Dict, Any, List, Optional
 
 def check_auth(headers: Dict[str, Any]) -> bool:
@@ -161,7 +162,7 @@ def get_entities(cur, entity: str) -> List[Dict]:
     elif entity == 'notifications':
         query = f"SELECT * FROM t_p90313977_education_center_web.{table} ORDER BY notification_type"
     else:
-        query = f"SELECT * FROM t_p90313977_education_center_web.{table} ORDER BY sort_order, id"
+        query = f"SELECT * FROM t_p90313977_education_center_web.{table} ORDER BY id"
     cur.execute(query)
     columns = [desc[0] for desc in cur.description]
     rows = cur.fetchall()
@@ -173,6 +174,8 @@ def get_entities(cur, entity: str) -> List[Dict]:
             val = row[i]
             if hasattr(val, 'isoformat'):
                 val = val.isoformat()
+            elif isinstance(val, Decimal):
+                val = float(val)
             row_dict[col] = val
         result.append(row_dict)
     
@@ -206,6 +209,8 @@ def get_entity_by_id(cur, entity: str, entity_id: str) -> Dict:
             val = row[i]
             if hasattr(val, 'isoformat'):
                 val = val.isoformat()
+            elif isinstance(val, Decimal):
+                val = float(val)
             row_dict[col] = val
         return row_dict
     return {}
