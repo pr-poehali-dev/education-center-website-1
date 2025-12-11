@@ -1,0 +1,32 @@
+{
+  "tests": [
+    {
+      "name": "Send notification",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "booking": {
+          "student_name": "Иван Иванов",
+          "student_phone": "+7 999 123 45 67",
+          "selected_subject": "Математика",
+          "selected_time": "10:00"
+        },
+        "settings": {
+          "telegram": {
+            "enabled": false,
+            "value": ""
+          },
+          "email": {
+            "enabled": false,
+            "value": ""
+          }
+        }
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "success": true
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

@@ -148,7 +148,8 @@ def get_entities(cur, entity: str) -> List[Dict]:
         'contacts': 'contacts',
         'reviews': 'reviews',
         'results': 'results',
-        'bookings': 'student_bookings'
+        'bookings': 'student_bookings',
+        'notifications': 'notification_settings'
     }
     
     table = table_map.get(entity)
@@ -157,6 +158,8 @@ def get_entities(cur, entity: str) -> List[Dict]:
     
     if entity == 'bookings':
         query = f"SELECT * FROM t_p90313977_education_center_web.{table} ORDER BY created_at DESC"
+    elif entity == 'notifications':
+        query = f"SELECT * FROM t_p90313977_education_center_web.{table} ORDER BY notification_type"
     else:
         query = f"SELECT * FROM t_p90313977_education_center_web.{table} ORDER BY sort_order, id"
     cur.execute(query)
@@ -184,7 +187,8 @@ def get_entity_by_id(cur, entity: str, entity_id: str) -> Dict:
         'contacts': 'contacts',
         'reviews': 'reviews',
         'results': 'results',
-        'bookings': 'student_bookings'
+        'bookings': 'student_bookings',
+        'notifications': 'notification_settings'
     }
     
     table = table_map.get(entity)
@@ -245,7 +249,8 @@ def update_entity(cur, conn, entity: str, entity_id: str, data: Dict) -> Dict:
         'contacts': ('contacts', ['type', 'value', 'icon', 'label', 'sort_order']),
         'reviews': ('reviews', ['author_name', 'author_photo', 'rating', 'review_text', 'date', 'is_published', 'sort_order']),
         'results': ('results', ['title', 'description', 'image_url', 'metric_value', 'metric_label', 'sort_order']),
-        'bookings': ('student_bookings', ['student_name', 'student_phone', 'student_email', 'selected_teacher', 'selected_subject', 'selected_time', 'status'])
+        'bookings': ('student_bookings', ['student_name', 'student_phone', 'student_email', 'selected_teacher', 'selected_subject', 'selected_time', 'status']),
+        'notifications': ('notification_settings', ['notification_type', 'is_enabled', 'value'])
     }
     
     table_info = table_map.get(entity)

@@ -48,3 +48,10 @@ export interface Booking {
   status?: string;
   created_at?: string;
 }
+
+export interface NotificationSetting {
+  id?: number;
+  notification_type: string;
+  is_enabled: boolean;
+  value: string;
+}

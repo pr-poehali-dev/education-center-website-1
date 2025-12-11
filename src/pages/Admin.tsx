@@ -9,7 +9,8 @@ import Icon from '@/components/ui/icon';
 import BookingsTab from '@/components/admin/BookingsTab';
 import { TeachersTab, ScheduleTab } from '@/components/admin/TeachersScheduleTabs';
 import { ContactsTab, ReviewsTab } from '@/components/admin/ContactsReviewsTabs';
-import type { Teacher, Schedule, Contact, Review, Booking } from '@/components/admin/types';
+import NotificationsTab from '@/components/admin/NotificationsTab';
+import type { Teacher, Schedule, Contact, Review, Booking, NotificationSetting } from '@/components/admin/types';
 
 const API_AUTH = 'https://functions.poehali.dev/ac68c96a-4b48-4841-afdd-c45fec1a7ad5';
 const API_DATA = 'https://functions.poehali.dev/a30f8752-d13c-41eb-99b2-d8709193a333';
@@ -27,6 +28,7 @@ const Admin = () => {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [notifications, setNotifications] = useState<NotificationSetting[]>([]);
 
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
@@ -74,6 +76,7 @@ const Admin = () => {
     await loadData('contacts', token, setContacts);
     await loadData('reviews', token, setReviews);
     await loadData('bookings', token, setBookings);
+    await loadData('notifications', token, setNotifications);
   };
 
   const loadData = async (entity: string, token: string, setter: any) => {
@@ -155,8 +158,9 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="bookings" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="bookings">Заявки</TabsTrigger>
+            <TabsTrigger value="notifications">Уведомления</TabsTrigger>
             <TabsTrigger value="teachers">Преподаватели</TabsTrigger>
             <TabsTrigger value="schedule">Расписание</TabsTrigger>
             <TabsTrigger value="contacts">Контакты</TabsTrigger>
@@ -165,6 +169,10 @@ const Admin = () => {
 
           <TabsContent value="bookings">
             <BookingsTab bookings={bookings} onSave={(data, isNew) => saveEntity('bookings', data, isNew)} />
+          </TabsContent>
+
+          <TabsContent value="notifications">
+            <NotificationsTab settings={notifications} onSave={(data, isNew) => saveEntity('notifications', data, isNew)} />
           </TabsContent>
 
           <TabsContent value="teachers">
