@@ -6,14 +6,48 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import Icon from '@/components/ui/icon';
-import BookingsTab from '@/components/admin/BookingsTab';
-import { TeachersTab, ScheduleTab } from '@/components/admin/TeachersScheduleTabs';
-import { ContactsTab, ReviewsTab } from '@/components/admin/ContactsReviewsTabs';
-import NotificationsTab from '@/components/admin/NotificationsTab';
-import type { Teacher, Schedule, Contact, Review, Booking, NotificationSetting } from '@/components/admin/types';
 
 const API_AUTH = 'https://functions.poehali.dev/ac68c96a-4b48-4841-afdd-c45fec1a7ad5';
 const API_DATA = 'https://functions.poehali.dev/a30f8752-d13c-41eb-99b2-d8709193a333';
+
+interface Teacher {
+  id?: number;
+  name: string;
+  photo_url?: string;
+  description?: string;
+  specialization?: string;
+  experience?: string;
+  sort_order?: number;
+}
+
+interface Schedule {
+  id?: number;
+  time: string;
+  title: string;
+  description?: string;
+  teacher_id?: number;
+  sort_order?: number;
+}
+
+interface Contact {
+  id?: number;
+  type: string;
+  value: string;
+  icon?: string;
+  label?: string;
+  sort_order?: number;
+}
+
+interface Review {
+  id?: number;
+  author_name: string;
+  author_photo?: string;
+  rating?: number;
+  review_text: string;
+  date?: string;
+  is_published?: boolean;
+  sort_order?: number;
+}
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -27,8 +61,6 @@ const Admin = () => {
   const [schedule, setSchedule] = useState<Schedule[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [notifications, setNotifications] = useState<NotificationSetting[]>([]);
 
   useEffect(() => {
     const token = localStorage.getItem('adminToken');
@@ -75,8 +107,6 @@ const Admin = () => {
     await loadData('schedule', token, setSchedule);
     await loadData('contacts', token, setContacts);
     await loadData('reviews', token, setReviews);
-    await loadData('bookings', token, setBookings);
-    await loadData('notifications', token, setNotifications);
   };
 
   const loadData = async (entity: string, token: string, setter: any) => {
@@ -157,23 +187,13 @@ const Admin = () => {
           </Button>
         </div>
 
-        <Tabs defaultValue="bookings" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="bookings">Заявки</TabsTrigger>
-            <TabsTrigger value="notifications">Уведомления</TabsTrigger>
+        <Tabs defaultValue="teachers" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="teachers">Преподаватели</TabsTrigger>
             <TabsTrigger value="schedule">Расписание</TabsTrigger>
             <TabsTrigger value="contacts">Контакты</TabsTrigger>
             <TabsTrigger value="reviews">Отзывы</TabsTrigger>
           </TabsList>
-
-          <TabsContent value="bookings">
-            <BookingsTab bookings={bookings} onSave={(data, isNew) => saveEntity('bookings', data, isNew)} />
-          </TabsContent>
-
-          <TabsContent value="notifications">
-            <NotificationsTab settings={notifications} onSave={(data, isNew) => saveEntity('notifications', data, isNew)} />
-          </TabsContent>
 
           <TabsContent value="teachers">
             <TeachersTab teachers={teachers} onSave={(data, isNew) => saveEntity('teachers', data, isNew)} />
@@ -191,6 +211,311 @@ const Admin = () => {
             <ReviewsTab reviews={reviews} onSave={(data, isNew) => saveEntity('reviews', data, isNew)} />
           </TabsContent>
         </Tabs>
+      </div>
+    </div>
+  );
+};
+
+const TeachersTab = ({ teachers, onSave }: { teachers: Teacher[], onSave: (data: Teacher, isNew: boolean) => void }) => {
+  const [editItem, setEditItem] = useState<Teacher | null>(null);
+  
+  const handleEdit = (teacher: Teacher) => {
+    setEditItem({ ...teacher });
+  };
+  
+  const handleNew = () => {
+    setEditItem({ name: '', specialization: '', experience: '', description: '' });
+  };
+  
+  const handleSave = () => {
+    if (editItem) {
+      onSave(editItem, !editItem.id);
+      setEditItem(null);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <Button onClick={handleNew}>
+        <Icon name="Plus" className="mr-2" size={20} />
+        Добавить преподавателя
+      </Button>
+      
+      {editItem && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{editItem.id ? 'Редактировать' : 'Новый преподаватель'}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Input
+              placeholder="Имя"
+              value={editItem.name}
+              onChange={(e) => setEditItem({ ...editItem, name: e.target.value })}
+            />
+            <Input
+              placeholder="URL фото"
+              value={editItem.photo_url || ''}
+              onChange={(e) => setEditItem({ ...editItem, photo_url: e.target.value })}
+            />
+            <Input
+              placeholder="Специализация"
+              value={editItem.specialization || ''}
+              onChange={(e) => setEditItem({ ...editItem, specialization: e.target.value })}
+            />
+            <Input
+              placeholder="Опыт работы"
+              value={editItem.experience || ''}
+              onChange={(e) => setEditItem({ ...editItem, experience: e.target.value })}
+            />
+            <Input
+              placeholder="Описание"
+              value={editItem.description || ''}
+              onChange={(e) => setEditItem({ ...editItem, description: e.target.value })}
+            />
+            <div className="flex gap-2">
+              <Button onClick={handleSave}>Сохранить</Button>
+              <Button variant="outline" onClick={() => setEditItem(null)}>Отмена</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid gap-4">
+        {teachers.map((teacher) => (
+          <Card key={teacher.id}>
+            <CardContent className="pt-6">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="font-bold text-lg">{teacher.name}</h3>
+                  <p className="text-sm text-gray-600">{teacher.specialization}</p>
+                  <p className="text-sm text-gray-500">{teacher.experience}</p>
+                </div>
+                <Button size="sm" onClick={() => handleEdit(teacher)}>
+                  <Icon name="Edit" size={16} />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const ScheduleTab = ({ schedule, onSave }: { schedule: Schedule[], onSave: (data: Schedule, isNew: boolean) => void }) => {
+  const [editItem, setEditItem] = useState<Schedule | null>(null);
+
+  const handleNew = () => {
+    setEditItem({ time: '', title: '', description: '' });
+  };
+
+  const handleSave = () => {
+    if (editItem) {
+      onSave(editItem, !editItem.id);
+      setEditItem(null);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <Button onClick={handleNew}>
+        <Icon name="Plus" className="mr-2" size={20} />
+        Добавить занятие
+      </Button>
+
+      {editItem && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{editItem.id ? 'Редактировать' : 'Новое занятие'}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Input
+              placeholder="Время (например: 09:00 - 10:30)"
+              value={editItem.time}
+              onChange={(e) => setEditItem({ ...editItem, time: e.target.value })}
+            />
+            <Input
+              placeholder="Название"
+              value={editItem.title}
+              onChange={(e) => setEditItem({ ...editItem, title: e.target.value })}
+            />
+            <Input
+              placeholder="Описание"
+              value={editItem.description || ''}
+              onChange={(e) => setEditItem({ ...editItem, description: e.target.value })}
+            />
+            <div className="flex gap-2">
+              <Button onClick={handleSave}>Сохранить</Button>
+              <Button variant="outline" onClick={() => setEditItem(null)}>Отмена</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid gap-4">
+        {schedule.map((item) => (
+          <Card key={item.id}>
+            <CardContent className="pt-6">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="font-bold">{item.time}</h3>
+                  <p className="text-lg">{item.title}</p>
+                  <p className="text-sm text-gray-600">{item.description}</p>
+                </div>
+                <Button size="sm" onClick={() => setEditItem({ ...item })}>
+                  <Icon name="Edit" size={16} />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const ContactsTab = ({ contacts, onSave }: { contacts: Contact[], onSave: (data: Contact, isNew: boolean) => void }) => {
+  const [editItem, setEditItem] = useState<Contact | null>(null);
+
+  const handleNew = () => {
+    setEditItem({ type: 'phone', value: '', label: '' });
+  };
+
+  const handleSave = () => {
+    if (editItem) {
+      onSave(editItem, !editItem.id);
+      setEditItem(null);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <Button onClick={handleNew}>
+        <Icon name="Plus" className="mr-2" size={20} />
+        Добавить контакт
+      </Button>
+
+      {editItem && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{editItem.id ? 'Редактировать' : 'Новый контакт'}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Input
+              placeholder="Тип (phone, email, address)"
+              value={editItem.type}
+              onChange={(e) => setEditItem({ ...editItem, type: e.target.value })}
+            />
+            <Input
+              placeholder="Значение"
+              value={editItem.value}
+              onChange={(e) => setEditItem({ ...editItem, value: e.target.value })}
+            />
+            <Input
+              placeholder="Подпись"
+              value={editItem.label || ''}
+              onChange={(e) => setEditItem({ ...editItem, label: e.target.value })}
+            />
+            <div className="flex gap-2">
+              <Button onClick={handleSave}>Сохранить</Button>
+              <Button variant="outline" onClick={() => setEditItem(null)}>Отмена</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid gap-4">
+        {contacts.map((contact) => (
+          <Card key={contact.id}>
+            <CardContent className="pt-6">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="font-bold">{contact.type}</h3>
+                  <p>{contact.value}</p>
+                  <p className="text-sm text-gray-600">{contact.label}</p>
+                </div>
+                <Button size="sm" onClick={() => setEditItem({ ...contact })}>
+                  <Icon name="Edit" size={16} />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const ReviewsTab = ({ reviews, onSave }: { reviews: Review[], onSave: (data: Review, isNew: boolean) => void }) => {
+  const [editItem, setEditItem] = useState<Review | null>(null);
+
+  const handleNew = () => {
+    setEditItem({ author_name: '', review_text: '', rating: 5, is_published: true });
+  };
+
+  const handleSave = () => {
+    if (editItem) {
+      onSave(editItem, !editItem.id);
+      setEditItem(null);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <Button onClick={handleNew}>
+        <Icon name="Plus" className="mr-2" size={20} />
+        Добавить отзыв
+      </Button>
+
+      {editItem && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{editItem.id ? 'Редактировать' : 'Новый отзыв'}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Input
+              placeholder="Имя автора"
+              value={editItem.author_name}
+              onChange={(e) => setEditItem({ ...editItem, author_name: e.target.value })}
+            />
+            <Input
+              placeholder="Текст отзыва"
+              value={editItem.review_text}
+              onChange={(e) => setEditItem({ ...editItem, review_text: e.target.value })}
+            />
+            <Input
+              type="number"
+              placeholder="Рейтинг (1-5)"
+              value={editItem.rating || 5}
+              onChange={(e) => setEditItem({ ...editItem, rating: parseInt(e.target.value) })}
+              min={1}
+              max={5}
+            />
+            <div className="flex gap-2">
+              <Button onClick={handleSave}>Сохранить</Button>
+              <Button variant="outline" onClick={() => setEditItem(null)}>Отмена</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid gap-4">
+        {reviews.map((review) => (
+          <Card key={review.id}>
+            <CardContent className="pt-6">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="font-bold">{review.author_name}</h3>
+                  <p className="text-sm">{review.review_text}</p>
+                  <p className="text-sm text-gray-600">Рейтинг: {review.rating}/5</p>
+                </div>
+                <Button size="sm" onClick={() => setEditItem({ ...review })}>
+                  <Icon name="Edit" size={16} />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
     </div>
   );

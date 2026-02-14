@@ -1,7 +1,6 @@
 import json
 import os
 import psycopg2
-from decimal import Decimal
 from typing import Dict, Any, List, Optional
 
 def check_auth(headers: Dict[str, Any]) -> bool:
@@ -26,7 +25,6 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     - /contacts - контакты
     - /reviews - отзывы
     - /results - результаты
-    - /bookings - заявки учеников
     '''
     method: str = event.get('httpMethod', 'GET')
     path_params = event.get('pathParams', {})
@@ -148,21 +146,14 @@ def get_entities(cur, entity: str) -> List[Dict]:
         'calendar': 'calendar_events',
         'contacts': 'contacts',
         'reviews': 'reviews',
-        'results': 'results',
-        'bookings': 'student_bookings',
-        'notifications': 'notification_settings'
+        'results': 'results'
     }
     
     table = table_map.get(entity)
     if not table:
         raise ValueError(f'Unknown entity: {entity}')
     
-    if entity == 'bookings':
-        query = f"SELECT * FROM t_p90313977_education_center_web.{table} ORDER BY created_at DESC"
-    elif entity == 'notifications':
-        query = f"SELECT * FROM t_p90313977_education_center_web.{table} ORDER BY notification_type"
-    else:
-        query = f"SELECT * FROM t_p90313977_education_center_web.{table} ORDER BY id"
+    query = f"SELECT * FROM t_p90313977_education_center_web.{table} ORDER BY sort_order, id"
     cur.execute(query)
     columns = [desc[0] for desc in cur.description]
     rows = cur.fetchall()
@@ -174,8 +165,6 @@ def get_entities(cur, entity: str) -> List[Dict]:
             val = row[i]
             if hasattr(val, 'isoformat'):
                 val = val.isoformat()
-            elif isinstance(val, Decimal):
-                val = float(val)
             row_dict[col] = val
         result.append(row_dict)
     
@@ -189,9 +178,7 @@ def get_entity_by_id(cur, entity: str, entity_id: str) -> Dict:
         'calendar': 'calendar_events',
         'contacts': 'contacts',
         'reviews': 'reviews',
-        'results': 'results',
-        'bookings': 'student_bookings',
-        'notifications': 'notification_settings'
+        'results': 'results'
     }
     
     table = table_map.get(entity)
@@ -209,8 +196,6 @@ def get_entity_by_id(cur, entity: str, entity_id: str) -> Dict:
             val = row[i]
             if hasattr(val, 'isoformat'):
                 val = val.isoformat()
-            elif isinstance(val, Decimal):
-                val = float(val)
             row_dict[col] = val
         return row_dict
     return {}
@@ -223,8 +208,7 @@ def create_entity(cur, conn, entity: str, data: Dict) -> Dict:
         'calendar': ('calendar_events', ['date', 'title', 'description', 'event_type', 'sort_order']),
         'contacts': ('contacts', ['type', 'value', 'icon', 'label', 'sort_order']),
         'reviews': ('reviews', ['author_name', 'author_photo', 'rating', 'review_text', 'date', 'is_published', 'sort_order']),
-        'results': ('results', ['title', 'description', 'image_url', 'metric_value', 'metric_label', 'sort_order']),
-        'bookings': ('student_bookings', ['student_name', 'student_phone', 'student_email', 'selected_teacher', 'selected_subject', 'selected_time', 'status'])
+        'results': ('results', ['title', 'description', 'image_url', 'metric_value', 'metric_label', 'sort_order'])
     }
     
     table_info = table_map.get(entity)
@@ -253,9 +237,7 @@ def update_entity(cur, conn, entity: str, entity_id: str, data: Dict) -> Dict:
         'calendar': ('calendar_events', ['date', 'title', 'description', 'event_type', 'sort_order']),
         'contacts': ('contacts', ['type', 'value', 'icon', 'label', 'sort_order']),
         'reviews': ('reviews', ['author_name', 'author_photo', 'rating', 'review_text', 'date', 'is_published', 'sort_order']),
-        'results': ('results', ['title', 'description', 'image_url', 'metric_value', 'metric_label', 'sort_order']),
-        'bookings': ('student_bookings', ['student_name', 'student_phone', 'student_email', 'selected_teacher', 'selected_subject', 'selected_time', 'status']),
-        'notifications': ('notification_settings', ['notification_type', 'is_enabled', 'value'])
+        'results': ('results', ['title', 'description', 'image_url', 'metric_value', 'metric_label', 'sort_order'])
     }
     
     table_info = table_map.get(entity)
