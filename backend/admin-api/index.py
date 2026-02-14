@@ -1,259 +1,161 @@
 import json
 import os
 import psycopg2
-from typing import Dict, Any, List, Optional
+from decimal import Decimal
 
-def check_auth(headers: Dict[str, Any]) -> bool:
-    '''Проверка токена аутентификации'''
-    auth_token = headers.get('X-Auth-Token', headers.get('x-auth-token', ''))
-    return auth_token.startswith('admin_')
+SCHEMA = 't_p90313977_education_center_web'
 
-def get_db_connection():
-    '''Создание подключения к базе данных'''
-    db_url = os.environ.get('DATABASE_URL')
-    conn = psycopg2.connect(db_url)
-    conn.autocommit = False
-    return conn
+CORS_HEADERS = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Auth-Token, X-User-Id, X-Session-Id',
+    'Access-Control-Max-Age': '86400'
+}
 
-def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    '''
-    API для управления данными администратором
-    Поддерживает CRUD операции для всех сущностей:
-    - /teachers - преподаватели
-    - /schedule - расписание
-    - /calendar - календарь событий
-    - /contacts - контакты
-    - /reviews - отзывы
-    - /results - результаты
-    '''
-    method: str = event.get('httpMethod', 'GET')
-    path_params = event.get('pathParams', {})
-    query_params = event.get('queryStringParameters', {}) or {}
-    headers = event.get('headers', {})
-    
+TABLE_MAP = {
+    'teachers': {
+        'table': 'teachers',
+        'fields': ['full_name', 'subject', 'experience_years', 'rating', 'phone', 'email', 'name', 'photo_url', 'description', 'specialization', 'experience', 'sort_order']
+    },
+    'subjects': {
+        'table': 'subjects',
+        'fields': ['name', 'exam_type']
+    },
+    'schedule': {
+        'table': 'schedule',
+        'fields': ['time', 'title', 'description', 'teacher_id', 'sort_order']
+    },
+    'contacts': {
+        'table': 'contacts',
+        'fields': ['type', 'value', 'icon', 'label', 'sort_order']
+    },
+    'reviews': {
+        'table': 'reviews',
+        'fields': ['author_name', 'author_photo', 'rating', 'review_text', 'date', 'is_published', 'sort_order']
+    },
+    'results': {
+        'table': 'results',
+        'fields': ['title', 'description', 'image_url', 'metric_value', 'metric_label', 'sort_order']
+    },
+    'bookings': {
+        'table': 'student_bookings',
+        'fields': ['student_name', 'student_phone', 'student_email', 'selected_teacher', 'selected_subject', 'selected_time', 'status']
+    }
+}
+
+def check_auth(headers):
+    token = headers.get('X-Auth-Token', headers.get('x-auth-token', ''))
+    return token.startswith('admin_')
+
+def response(status, body):
+    return {
+        'statusCode': status,
+        'headers': {**CORS_HEADERS, 'Content-Type': 'application/json'},
+        'body': json.dumps(body) if not isinstance(body, str) else body,
+        'isBase64Encoded': False
+    }
+
+def serialize(val):
+    if hasattr(val, 'isoformat'):
+        return val.isoformat()
+    if isinstance(val, Decimal):
+        return float(val)
+    return val
+
+def rows_to_dicts(cur):
+    columns = [d[0] for d in cur.description]
+    return [{col: serialize(row[i]) for i, col in enumerate(columns)} for row in cur.fetchall()]
+
+def handler(event, context):
+    '''API управления данными сайта — преподаватели, предметы, расписание, контакты, отзывы, заявки'''
+    method = event.get('httpMethod', 'GET')
+
     if method == 'OPTIONS':
-        return {
-            'statusCode': 200,
-            'headers': {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type, X-Auth-Token',
-                'Access-Control-Max-Age': '86400'
-            },
-            'body': '',
-            'isBase64Encoded': False
-        }
-    
-    if not check_auth(headers):
-        return {
-            'statusCode': 401,
-            'headers': {
-                'Access-Control-Allow-Origin': '*',
-                'Content-Type': 'application/json'
-            },
-            'body': json.dumps({'error': 'Unauthorized'}),
-            'isBase64Encoded': False
-        }
-    
-    conn = None
-    cur = None
-    
+        return {'statusCode': 200, 'headers': CORS_HEADERS, 'body': '', 'isBase64Encoded': False}
+
+    if not check_auth(event.get('headers', {})):
+        return response(401, {'error': 'Unauthorized'})
+
+    qp = event.get('queryStringParameters', {}) or {}
+    entity = qp.get('entity', '')
+    entity_id = qp.get('id', '')
+
+    if entity not in TABLE_MAP:
+        return response(400, {'error': f'Unknown entity: {entity}'})
+
+    info = TABLE_MAP[entity]
+    table = f"{SCHEMA}.{info['table']}"
+
+    conn = psycopg2.connect(os.environ['DATABASE_URL'])
+    conn.autocommit = False
+    cur = conn.cursor()
+
     try:
-        entity = query_params.get('entity', '')
-        entity_id = query_params.get('id', '')
-        
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
         if method == 'GET':
             if entity_id:
-                result = get_entity_by_id(cur, entity, entity_id)
+                cur.execute(f"SELECT * FROM {table} WHERE id = %s", (entity_id,))
+                rows = rows_to_dicts(cur)
+                result = rows[0] if rows else {}
             else:
-                result = get_entities(cur, entity)
-            
+                has_sort = entity not in ('subjects', 'bookings')
+                order = "ORDER BY COALESCE(sort_order, 0), id" if has_sort else "ORDER BY id"
+                cur.execute(f"SELECT * FROM {table} {order}")
+                result = rows_to_dicts(cur)
             cur.close()
             conn.close()
-            
-            return {
-                'statusCode': 200,
-                'headers': {
-                    'Access-Control-Allow-Origin': '*',
-                    'Content-Type': 'application/json'
-                },
-                'body': json.dumps(result),
-                'isBase64Encoded': False
-            }
-        
+            return response(200, result)
+
         elif method == 'POST':
-            body_data = json.loads(event.get('body', '{}'))
-            result = create_entity(cur, conn, entity, body_data)
-            
-            return {
-                'statusCode': 201,
-                'headers': {
-                    'Access-Control-Allow-Origin': '*',
-                    'Content-Type': 'application/json'
-                },
-                'body': json.dumps(result),
-                'isBase64Encoded': False
-            }
-        
+            data = json.loads(event.get('body', '{}'))
+            cols = [f for f in info['fields'] if f in data and data[f] is not None]
+            vals = [data[f] for f in cols]
+            ph = ', '.join(['%s'] * len(cols))
+            cur.execute(f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({ph}) RETURNING id", vals)
+            new_id = cur.fetchone()[0]
+            conn.commit()
+            cur.close()
+            conn.close()
+            return response(201, {'id': new_id, 'success': True})
+
         elif method == 'PUT':
-            body_data = json.loads(event.get('body', '{}'))
-            result = update_entity(cur, conn, entity, entity_id, body_data)
-            
-            return {
-                'statusCode': 200,
-                'headers': {
-                    'Access-Control-Allow-Origin': '*',
-                    'Content-Type': 'application/json'
-                },
-                'body': json.dumps(result),
-                'isBase64Encoded': False
-            }
-        
+            if not entity_id:
+                cur.close()
+                conn.close()
+                return response(400, {'error': 'id required'})
+            data = json.loads(event.get('body', '{}'))
+            cols = [f for f in info['fields'] if f in data]
+            if not cols:
+                cur.close()
+                conn.close()
+                return response(400, {'error': 'No fields to update'})
+            sets = ', '.join([f"{c} = %s" for c in cols])
+            vals = [data[c] for c in cols]
+            vals.append(entity_id)
+            cur.execute(f"UPDATE {table} SET {sets} WHERE id = %s", vals)
+            conn.commit()
+            cur.close()
+            conn.close()
+            return response(200, {'success': True})
+
+        elif method == 'DELETE':
+            if not entity_id:
+                cur.close()
+                conn.close()
+                return response(400, {'error': 'id required'})
+            cur.execute(f"DELETE FROM {table} WHERE id = %s", (entity_id,))
+            conn.commit()
+            cur.close()
+            conn.close()
+            return response(200, {'success': True})
+
         else:
-            return {
-                'statusCode': 405,
-                'headers': {
-                    'Access-Control-Allow-Origin': '*',
-                    'Content-Type': 'application/json'
-                },
-                'body': json.dumps({'error': 'Method not allowed'}),
-                'isBase64Encoded': False
-            }
-    
+            cur.close()
+            conn.close()
+            return response(405, {'error': 'Method not allowed'})
+
     except Exception as e:
         if cur:
             cur.close()
         if conn:
             conn.close()
-        return {
-            'statusCode': 500,
-            'headers': {
-                'Access-Control-Allow-Origin': '*',
-                'Content-Type': 'application/json'
-            },
-            'body': json.dumps({'error': str(e)}),
-            'isBase64Encoded': False
-        }
-
-def get_entities(cur, entity: str) -> List[Dict]:
-    '''Получение списка всех сущностей'''
-    table_map = {
-        'teachers': 'teachers',
-        'schedule': 'schedule',
-        'calendar': 'calendar_events',
-        'contacts': 'contacts',
-        'reviews': 'reviews',
-        'results': 'results'
-    }
-    
-    table = table_map.get(entity)
-    if not table:
-        raise ValueError(f'Unknown entity: {entity}')
-    
-    query = f"SELECT * FROM t_p90313977_education_center_web.{table} ORDER BY sort_order, id"
-    cur.execute(query)
-    columns = [desc[0] for desc in cur.description]
-    rows = cur.fetchall()
-    
-    result = []
-    for row in rows:
-        row_dict = {}
-        for i, col in enumerate(columns):
-            val = row[i]
-            if hasattr(val, 'isoformat'):
-                val = val.isoformat()
-            row_dict[col] = val
-        result.append(row_dict)
-    
-    return result
-
-def get_entity_by_id(cur, entity: str, entity_id: str) -> Dict:
-    '''Получение одной сущности по ID'''
-    table_map = {
-        'teachers': 'teachers',
-        'schedule': 'schedule',
-        'calendar': 'calendar_events',
-        'contacts': 'contacts',
-        'reviews': 'reviews',
-        'results': 'results'
-    }
-    
-    table = table_map.get(entity)
-    if not table:
-        raise ValueError(f'Unknown entity: {entity}')
-    
-    query = f"SELECT * FROM t_p90313977_education_center_web.{table} WHERE id = %s"
-    cur.execute(query, (entity_id,))
-    columns = [desc[0] for desc in cur.description]
-    row = cur.fetchone()
-    
-    if row:
-        row_dict = {}
-        for i, col in enumerate(columns):
-            val = row[i]
-            if hasattr(val, 'isoformat'):
-                val = val.isoformat()
-            row_dict[col] = val
-        return row_dict
-    return {}
-
-def create_entity(cur, conn, entity: str, data: Dict) -> Dict:
-    '''Создание новой сущности'''
-    table_map = {
-        'teachers': ('teachers', ['name', 'photo_url', 'description', 'specialization', 'experience', 'sort_order']),
-        'schedule': ('schedule', ['time', 'title', 'description', 'teacher_id', 'sort_order']),
-        'calendar': ('calendar_events', ['date', 'title', 'description', 'event_type', 'sort_order']),
-        'contacts': ('contacts', ['type', 'value', 'icon', 'label', 'sort_order']),
-        'reviews': ('reviews', ['author_name', 'author_photo', 'rating', 'review_text', 'date', 'is_published', 'sort_order']),
-        'results': ('results', ['title', 'description', 'image_url', 'metric_value', 'metric_label', 'sort_order'])
-    }
-    
-    table_info = table_map.get(entity)
-    if not table_info:
-        raise ValueError(f'Unknown entity: {entity}')
-    
-    table, fields = table_info
-    
-    columns = [f for f in fields if f in data]
-    values = [data[f] for f in columns]
-    placeholders = ', '.join(['%s'] * len(columns))
-    columns_str = ', '.join(columns)
-    
-    query = f"INSERT INTO t_p90313977_education_center_web.{table} ({columns_str}) VALUES ({placeholders}) RETURNING id"
-    cur.execute(query, values)
-    new_id = cur.fetchone()[0]
-    conn.commit()
-    
-    return {'id': new_id, 'success': True}
-
-def update_entity(cur, conn, entity: str, entity_id: str, data: Dict) -> Dict:
-    '''Обновление существующей сущности'''
-    table_map = {
-        'teachers': ('teachers', ['name', 'photo_url', 'description', 'specialization', 'experience', 'sort_order']),
-        'schedule': ('schedule', ['time', 'title', 'description', 'teacher_id', 'sort_order']),
-        'calendar': ('calendar_events', ['date', 'title', 'description', 'event_type', 'sort_order']),
-        'contacts': ('contacts', ['type', 'value', 'icon', 'label', 'sort_order']),
-        'reviews': ('reviews', ['author_name', 'author_photo', 'rating', 'review_text', 'date', 'is_published', 'sort_order']),
-        'results': ('results', ['title', 'description', 'image_url', 'metric_value', 'metric_label', 'sort_order'])
-    }
-    
-    table_info = table_map.get(entity)
-    if not table_info:
-        raise ValueError(f'Unknown entity: {entity}')
-    
-    table, fields = table_info
-    
-    columns = [f for f in fields if f in data]
-    values = [data[f] for f in columns]
-    
-    set_clause = ', '.join([f"{col} = %s" for col in columns])
-    values.append(entity_id)
-    
-    query = f"UPDATE t_p90313977_education_center_web.{table} SET {set_clause}, updated_at = CURRENT_TIMESTAMP WHERE id = %s"
-    cur.execute(query, values)
-    conn.commit()
-    
-    return {'success': True, 'updated': cur.rowcount}
+        return response(500, {'error': str(e)})

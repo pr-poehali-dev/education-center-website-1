@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -8,14 +8,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Calendar } from "@/components/ui/calendar";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -26,13 +24,52 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Icon from "@/components/ui/icon";
+import { useToast } from "@/hooks/use-toast";
+
+const API_PUBLIC = "https://functions.poehali.dev/3fe1afdd-d3fa-410a-8629-ad0d3e8996fe";
+
+interface Teacher {
+  id: number;
+  full_name: string;
+  subject: string;
+  experience_years: number;
+  rating: number;
+  photo_url?: string;
+  description?: string;
+}
+
+interface Subject {
+  id: number;
+  name: string;
+  exam_type?: string;
+}
+
+interface Review {
+  id: number;
+  author_name: string;
+  rating: number;
+  review_text: string;
+  date?: string;
+}
+
+interface Contact {
+  id: number;
+  type: string;
+  value: string;
+  icon?: string;
+  label?: string;
+}
+
+interface ScheduleItem {
+  id: number;
+  time: string;
+  title: string;
+  description?: string;
+}
 
 const Index = () => {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(
-    new Date(),
-  );
+  const { toast } = useToast();
   const [activeSection, setActiveSection] = useState("home");
   const [bookingOpen, setBookingOpen] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState("");
@@ -41,296 +78,230 @@ const Index = () => {
   const [studentName, setStudentName] = useState("");
   const [studentPhone, setStudentPhone] = useState("");
   const [studentEmail, setStudentEmail] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [schedule, setSchedule] = useState<ScheduleItem[]>([]);
+
+  useEffect(() => {
+    loadData("teachers", setTeachers);
+    loadData("subjects", setSubjects);
+    loadData("reviews", setReviews);
+    loadData("contacts", setContacts);
+    loadData("schedule", setSchedule);
+  }, []);
+
+  const loadData = async (entity: string, setter: (data: any[]) => void) => {
+    try {
+      const res = await fetch(`${API_PUBLIC}?entity=${entity}`);
+      const data = await res.json();
+      if (Array.isArray(data)) setter(data);
+    } catch (e) {
+      console.error(`Failed to load ${entity}`, e);
+    }
+  };
 
   const scrollToSection = (sectionId: string) => {
     setActiveSection(sectionId);
-    const element = document.getElementById(sectionId);
-    element?.scrollIntoView({ behavior: "smooth" });
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const subjects = [
-    { name: "Математика", color: "bg-primary", students: 45 },
-    { name: "Русский язык", color: "bg-secondary", students: 38 },
-    { name: "Физика", color: "bg-accent", students: 32 },
-    { name: "Обществознание", color: "bg-primary", students: 41 },
-    { name: "Химия", color: "bg-secondary", students: 28 },
-    { name: "Биология", color: "bg-accent", students: 35 },
-  ];
-
-  const teachers = [
-    {
-      name: "Я внатуре отморозок жес",
-      subject: "Математика",
-      experience: "15 лет",
-      rating: 4.9,
-      students: 120,
-      image: "/img/7a073bd2-7f17-418a-8b5a-6b500641d169.jpg",
-    },
-    {
-      name: "я тоже вацок",
-      subject: "Физика",
-      experience: "12 лет",
-      rating: 4.8,
-      students: 95,
-      image: "/img/7a073bd2-7f17-418a-8b5a-6b500641d169.jpg",
-    },
-    {
-      name: "рот закрой да по братски",
-      subject: "Русский язык",
-      experience: "18 лет",
-      rating: 4.9,
-      students: 110,
-      image: "/img/7a073bd2-7f17-418a-8b5a-6b500641d169.jpg",
-    },
-  ];
-
-  const results = [
-    { exam: "ЕГЭ Математика", averageScore: 87, successRate: 94 },
-    { exam: "ОГЭ Русский язык", averageScore: 4.6, successRate: 96 },
-    { exam: "ЕГЭ Физика", averageScore: 82, successRate: 89 },
-    { exam: "ОГЭ Математика", averageScore: 4.4, successRate: 92 },
-  ];
-
-  const testimonials = [
-    {
-      name: "Мария Иванова",
-      text: "Благодаря занятиям в центре сдала ЕГЭ по математике на 95 баллов! Преподаватели объясняют сложные темы простым языком.",
-      score: 95,
-      subject: "Математика",
-    },
-    {
-      name: "Дмитрий Петров",
-      text: "Отличная подготовка к ОГЭ. Систематизировал знания и повысил уверенность в себе. Рекомендую!",
-      score: 5,
-      subject: "Русский язык",
-    },
-    {
-      name: "Анастасия Волкова",
-      text: "Поступила в МГУ благодаря качественной подготовке. Спасибо преподавателям за терпение и профессионализм!",
-      score: 89,
-      subject: "Физика",
-    },
-  ];
-
-  const schedule = [
-    {
-      time: "9:00",
-      subject: "Математика (ЕГЭ)",
-      teacher: "А.П. Смирнова",
-      room: "201",
-    },
-    {
-      time: "11:00",
-      subject: "Русский язык (ОГЭ)",
-      teacher: "Е.В. Зайцева",
-      room: "105",
-    },
-    {
-      time: "13:00",
-      subject: "Физика (ЕГЭ)",
-      teacher: "М.А. Козлов",
-      room: "301",
-    },
-    {
-      time: "15:00",
-      subject: "Математика (ОГЭ)",
-      teacher: "А.П. Смирнова",
-      room: "201",
-    },
-    {
-      time: "17:00",
-      subject: "Обществознание",
-      teacher: "И.С. Новиков",
-      room: "102",
-    },
-  ];
-
-  const availableSlots = [
-    { time: "9:00", available: true },
-    { time: "11:00", available: true },
-    { time: "13:00", available: false },
-    { time: "15:00", available: true },
-    { time: "17:00", available: true },
-    { time: "19:00", available: true },
-  ];
-
-  const handleBooking = () => {
-    if (
-      !selectedTeacher ||
-      !selectedSubject ||
-      !selectedTime ||
-      !studentName ||
-      !studentPhone
-    ) {
-      alert("Пожалуйста, заполните все обязательные поля");
-      return;
-    }
-    alert(`Заявка отправлена!
-Преподаватель: ${selectedTeacher}
-Предмет: ${selectedSubject}
-Время: ${selectedTime}
-Ученик: ${studentName}
-
-Мы свяжемся с вами в ближайшее время!`);
-    setBookingOpen(false);
-    setSelectedTeacher("");
-    setSelectedSubject("");
-    setSelectedTime("");
-    setStudentName("");
-    setStudentPhone("");
-    setStudentEmail("");
-  };
-
-  const openBookingModal = (teacher?: string, subject?: string) => {
+  const openBooking = (teacher?: string, subject?: string) => {
     if (teacher) setSelectedTeacher(teacher);
     if (subject) setSelectedSubject(subject);
     setBookingOpen(true);
   };
 
+  const handleBooking = async () => {
+    if (!studentName || !studentPhone) {
+      toast({ title: "Заполните обязательные поля", variant: "destructive" });
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const bookingUrl = "https://functions.poehali.dev/98346566-b607-4709-8500-51e601b9d6e9";
+      await fetch(bookingUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          student_name: studentName,
+          student_phone: studentPhone,
+          student_email: studentEmail,
+          selected_teacher: selectedTeacher,
+          selected_subject: selectedSubject,
+          selected_time: selectedTime,
+        }),
+      });
+      toast({ title: "Заявка отправлена!", description: "Мы свяжемся с вами в ближайшее время" });
+      setBookingOpen(false);
+      setSelectedTeacher("");
+      setSelectedSubject("");
+      setSelectedTime("");
+      setStudentName("");
+      setStudentPhone("");
+      setStudentEmail("");
+    } catch {
+      toast({ title: "Ошибка отправки", variant: "destructive" });
+    }
+    setSubmitting(false);
+  };
+
+  const subjectColors = [
+    "from-orange-500 to-amber-500",
+    "from-indigo-500 to-purple-500",
+    "from-emerald-500 to-teal-500",
+    "from-rose-500 to-pink-500",
+    "from-cyan-500 to-blue-500",
+    "from-violet-500 to-fuchsia-500",
+  ];
+
+  const subjectIcons = ["Calculator", "BookOpen", "Atom", "FlaskConical", "Leaf", "Globe"];
+
   return (
     <div className="min-h-screen bg-background font-sans">
-      {/* Navigation */}
-      <nav className="fixed top-0 w-full bg-white/95 backdrop-blur-sm border-b z-50">
+      <nav className="fixed top-0 w-full glass z-50 shadow-sm">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Icon name="GraduationCap" size={32} className="text-primary" />
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
+                <Icon name="GraduationCap" size={22} className="text-white" />
+              </div>
               <span className="text-xl font-heading font-bold">Samur</span>
             </div>
-            <div className="hidden md:flex items-center space-x-6">
-              {[
-                "Главная",
-                "Преподаватели",
-                "Результаты",
-                "Отзывы",
-                "Контакты",
-              ].map((item, index) => (
-                <button
-                  key={item}
-                  onClick={() =>
-                    scrollToSection(
-                      [
-                        "home",
-                        "teachers",
-                        "results",
-                        "testimonials",
-                        "contacts",
-                      ][index],
-                    )
-                  }
-                  className={`text-sm font-medium transition-colors hover:text-primary ${
-                    activeSection ===
-                    ["home", "teachers", "results", "testimonials", "contacts"][
-                      index
-                    ]
-                      ? "text-primary"
-                      : "text-gray-600"
-                  }`}
-                >
-                  {item}
-                </button>
-              ))}
+            <div className="hidden md:flex items-center gap-8">
+              {["Главная", "Предметы", "Преподаватели", "Отзывы", "Контакты"].map(
+                (item, i) => (
+                  <button
+                    key={item}
+                    onClick={() =>
+                      scrollToSection(
+                        ["home", "subjects", "teachers", "testimonials", "contacts"][i]
+                      )
+                    }
+                    className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {item}
+                  </button>
+                )
+              )}
             </div>
-            <Dialog open={bookingOpen} onOpenChange={setBookingOpen}>
-              <DialogTrigger asChild>
-                <Button className="hidden md:block">Записаться</Button>
-              </DialogTrigger>
-            </Dialog>
+            <Button onClick={() => openBooking()} className="gradient-primary border-0 text-white shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 transition-all">
+              Записаться
+            </Button>
           </div>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section id="home" className="pt-20 pb-16 px-4">
-        <div className="container mx-auto">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
+      <section id="home" className="pt-28 pb-20 px-4 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-orange-50 via-white to-indigo-50" />
+        <div className="absolute top-20 right-0 w-96 h-96 bg-orange-200/30 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-80 h-80 bg-indigo-200/30 rounded-full blur-3xl" />
+        <div className="container mx-auto relative">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div className="animate-fade-in">
-              <h1 className="text-4xl lg:text-6xl font-heading font-bold text-foreground mb-6">
-                Подготовка к <span className="text-primary">ОГЭ</span> и{" "}
-                <span className="text-secondary">ЕГЭ</span>
+              <div className="inline-flex items-center gap-2 bg-orange-100 text-orange-700 rounded-full px-4 py-1.5 text-sm font-medium mb-6">
+                <Icon name="Sparkles" size={16} />
+                Образовательный центр Samur
+              </div>
+              <h1 className="text-4xl lg:text-6xl font-heading font-extrabold text-foreground mb-6 leading-tight">
+                Подготовка к{" "}
+                <span className="bg-clip-text text-transparent gradient-primary">ОГЭ</span> и{" "}
+                <span className="bg-clip-text text-transparent gradient-secondary">ЕГЭ</span>
               </h1>
-              <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
+              <p className="text-lg text-muted-foreground mb-8 leading-relaxed max-w-lg">
                 Индивидуальный подход, опытные преподаватели и проверенные
                 методики. Помогаем достичь высоких результатов и поступить в
-                желаемый вуз.
+                лучшие вузы страны.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 mb-8">
+              <div className="flex flex-col sm:flex-row gap-4 mb-10">
                 <Button
                   size="lg"
-                  className="text-lg px-8"
-                  onClick={() => openBookingModal()}
+                  className="text-lg px-8 gradient-primary border-0 text-white shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40"
+                  onClick={() => openBooking()}
                 >
-                  <Icon name="BookOpen" size={20} className="mr-2" />
-                  Начать обучение
+                  <Icon name="Rocket" size={20} className="mr-2" />
+                  Записаться бесплатно
                 </Button>
                 <Button
-                  variant="outline"
                   size="lg"
+                  variant="outline"
                   className="text-lg px-8"
-                  onClick={() => openBookingModal()}
+                  onClick={() => scrollToSection("teachers")}
                 >
-                  <Icon name="Phone" size={20} className="mr-2" />
-                  Консультация
+                  Наши преподаватели
                 </Button>
               </div>
-              <div className="grid grid-cols-3 gap-6">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-primary">500+</div>
-                  <div className="text-sm text-muted-foreground">
-                    Выпускников
+              <div className="grid grid-cols-3 gap-4">
+                {[
+                  { value: "15+", label: "Лет опыта", gradient: "from-orange-500 to-amber-500" },
+                  { value: "500+", label: "Учеников", gradient: "from-indigo-500 to-purple-500" },
+                  { value: "94%", label: "Поступление", gradient: "from-emerald-500 to-teal-500" },
+                ].map((stat) => (
+                  <div key={stat.label} className="text-center p-4 rounded-2xl bg-white shadow-sm border">
+                    <div className={`text-3xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r ${stat.gradient} mb-1`}>
+                      {stat.value}
+                    </div>
+                    <div className="text-sm text-muted-foreground">{stat.label}</div>
                   </div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-secondary">99%</div>
-                  <div className="text-sm text-muted-foreground">
-                    Поступления
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-accent">8</div>
-                  <div className="text-sm text-muted-foreground">Лет опыта</div>
-                </div>
+                ))}
               </div>
             </div>
-            <div className="animate-scale-in">
-              <img
-                src="/img/b49f028c-befa-4b36-a789-fe5a5adc65be.jpg"
-                alt="Современное образование"
-                className="w-full h-[500px] object-cover rounded-2xl shadow-2xl"
-              />
+            <div className="relative">
+              <div className="grid grid-cols-2 gap-4">
+                {(subjects.length > 0 ? subjects.slice(0, 6) : [
+                  { id: 1, name: "Математика" },
+                  { id: 2, name: "Русский язык" },
+                  { id: 3, name: "Физика" },
+                  { id: 4, name: "Химия" },
+                  { id: 5, name: "Биология" },
+                  { id: 6, name: "Обществознание" },
+                ]).map((subj, i) => (
+                  <div
+                    key={subj.id}
+                    className={`p-6 bg-gradient-to-br ${subjectColors[i % subjectColors.length]} text-white rounded-2xl shadow-lg hover:scale-105 hover:shadow-xl transition-all cursor-pointer`}
+                  >
+                    <Icon name={subjectIcons[i % subjectIcons.length] as any} size={32} className="mb-3 opacity-90" />
+                    <h3 className="font-bold text-lg">{subj.name}</h3>
+                    {(subj as Subject).exam_type && (
+                      <p className="text-sm opacity-80 mt-1">{(subj as Subject).exam_type}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Subjects Section */}
-      <section className="py-16 px-4 bg-muted/30">
+      <section id="subjects" className="py-20 px-4">
         <div className="container mx-auto">
-          <h2 className="text-3xl font-heading font-bold text-center mb-12">
-            Предметы подготовки
-          </h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {subjects.map((subject, index) => (
+          <div className="text-center mb-14">
+            <Badge className="mb-4 gradient-secondary border-0 text-white">Предметы</Badge>
+            <h2 className="text-3xl lg:text-5xl font-heading font-bold mb-4">
+              Направления подготовки
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Выберите предмет и начните подготовку уже сегодня
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+            {subjects.map((subj, i) => (
               <Card
-                key={index}
-                className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1"
+                key={subj.id}
+                className="group hover:shadow-xl transition-all cursor-pointer border-2 hover:border-orange-200"
+                onClick={() => openBooking("", subj.name)}
               >
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">{subject.name}</CardTitle>
-                    <div
-                      className={`w-3 h-3 rounded-full ${subject.color}`}
-                    ></div>
+                <CardContent className="p-6 text-center">
+                  <div className={`w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br ${subjectColors[i % subjectColors.length]} flex items-center justify-center shadow-lg`}>
+                    <Icon name={subjectIcons[i % subjectIcons.length] as any} size={24} className="text-white" />
                   </div>
-                  <CardDescription>{subject.students} учеников</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">
-                      ОГЭ • ЕГЭ
-                    </span>
-                    <Badge variant="secondary">Доступно</Badge>
-                  </div>
+                  <h3 className="font-semibold text-base">{subj.name}</h3>
+                  {subj.exam_type && (
+                    <p className="text-sm text-muted-foreground mt-1">{subj.exam_type}</p>
+                  )}
                 </CardContent>
               </Card>
             ))}
@@ -338,118 +309,55 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Schedule Section */}
-      <section className="py-16 px-4">
+      <section id="teachers" className="py-20 px-4 bg-gradient-to-b from-slate-50 to-white">
         <div className="container mx-auto">
-          <h2 className="text-3xl font-heading font-bold text-center mb-12">
-            Расписание и календарь
-          </h2>
-          <div className="grid lg:grid-cols-2 gap-12">
-            <div>
-              <h3 className="text-xl font-semibold mb-6">
-                Расписание на сегодня
-              </h3>
-              <div className="space-y-4">
-                {schedule.map((item, index) => (
-                  <Card key={index} className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-4">
-                        <div className="text-lg font-semibold text-primary">
-                          {item.time}
-                        </div>
-                        <div>
-                          <div className="font-medium">{item.subject}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {item.teacher} • Аудитория {item.room}
-                          </div>
-                        </div>
-                      </div>
-                      <Icon
-                        name="Clock"
-                        size={20}
-                        className="text-muted-foreground"
-                      />
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            </div>
-            <div>
-              <h3 className="text-xl font-semibold mb-6">
-                Календарь подготовки
-              </h3>
-              <div className="bg-card rounded-lg p-6">
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={setSelectedDate}
-                  className="rounded-md"
-                />
-                <div className="mt-4 space-y-2">
-                  <div className="flex items-center space-x-2 text-sm">
-                    <div className="w-3 h-3 rounded-full bg-primary"></div>
-                    <span>Пробные экзамены</span>
-                  </div>
-                  <div className="flex items-center space-x-2 text-sm">
-                    <div className="w-3 h-3 rounded-full bg-secondary"></div>
-                    <span>Контрольные работы</span>
-                  </div>
-                  <div className="flex items-center space-x-2 text-sm">
-                    <div className="w-3 h-3 rounded-full bg-accent"></div>
-                    <span>Дополнительные занятия</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+          <div className="text-center mb-14">
+            <Badge className="mb-4 gradient-primary border-0 text-white">Команда</Badge>
+            <h2 className="text-3xl lg:text-5xl font-heading font-bold mb-4">
+              Наши преподаватели
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Опытные педагоги с подтверждёнными результатами учеников
+            </p>
           </div>
-        </div>
-      </section>
-
-      {/* Teachers Section */}
-      <section id="teachers" className="py-16 px-4 bg-muted/30">
-        <div className="container mx-auto">
-          <h2 className="text-3xl font-heading font-bold text-center mb-12">
-            Наши преподаватели
-          </h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {teachers.map((teacher, index) => (
+            {teachers.map((teacher) => (
               <Card
-                key={index}
-                className="overflow-hidden hover:shadow-lg transition-all duration-300"
+                key={teacher.id}
+                className="group hover:shadow-2xl transition-all overflow-hidden border-0 shadow-lg"
               >
-                <div className="aspect-square overflow-hidden">
-                  <img
-                    src={teacher.image}
-                    alt={teacher.name}
-                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                  />
+                <div className="h-48 bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center relative overflow-hidden">
+                  {teacher.photo_url ? (
+                    <img src={teacher.photo_url} alt={teacher.full_name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-24 h-24 rounded-full gradient-primary flex items-center justify-center text-white text-3xl font-bold">
+                      {teacher.full_name.charAt(0)}
+                    </div>
+                  )}
+                  <div className="absolute top-3 right-3">
+                    <Badge className="bg-white/90 text-foreground shadow-sm">
+                      <Icon name="Star" size={14} className="mr-1 text-amber-500" />
+                      {teacher.rating}
+                    </Badge>
+                  </div>
                 </div>
-                <CardHeader>
-                  <CardTitle className="text-lg">{teacher.name}</CardTitle>
-                  <CardDescription>
-                    {teacher.subject} • {teacher.experience}
-                  </CardDescription>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-xl">{teacher.full_name}</CardTitle>
+                  <CardDescription className="text-base">{teacher.subject}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center space-x-1">
-                      <Icon
-                        name="Star"
-                        size={16}
-                        className="text-yellow-500 fill-current"
-                      />
-                      <span className="font-semibold">{teacher.rating}</span>
+                  <div className="flex items-center gap-4 mb-4 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <Icon name="Award" size={16} className="text-orange-500" />
+                      {teacher.experience_years} лет
                     </div>
-                    <span className="text-sm text-muted-foreground">
-                      {teacher.students} учеников
-                    </span>
                   </div>
+                  {teacher.description && (
+                    <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{teacher.description}</p>
+                  )}
                   <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() =>
-                      openBookingModal(teacher.name, teacher.subject)
-                    }
+                    className="w-full gradient-primary border-0 text-white"
+                    onClick={() => openBooking(teacher.full_name, teacher.subject)}
                   >
                     Записаться
                   </Button>
@@ -460,332 +368,236 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Results Section */}
-      <section id="results" className="py-16 px-4">
-        <div className="container mx-auto">
-          <h2 className="text-3xl font-heading font-bold text-center mb-12">
-            Результаты учеников
-          </h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {results.map((result, index) => (
-              <Card key={index} className="text-center p-6">
-                <CardHeader>
-                  <CardTitle className="text-lg">{result.exam}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <div className="text-3xl font-bold text-primary">
-                        {result.averageScore}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Средний балл
+      {schedule.length > 0 && (
+        <section className="py-20 px-4">
+          <div className="container mx-auto">
+            <div className="text-center mb-14">
+              <Badge className="mb-4 gradient-accent border-0 text-white">Расписание</Badge>
+              <h2 className="text-3xl lg:text-5xl font-heading font-bold mb-4">
+                Расписание занятий
+              </h2>
+            </div>
+            <div className="grid gap-4 max-w-3xl mx-auto">
+              {schedule.map((item) => (
+                <Card key={item.id} className="hover:shadow-lg transition-all border-l-4 border-l-orange-500">
+                  <CardContent className="p-5 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="text-2xl font-bold text-orange-500 min-w-[60px]">{item.time}</div>
+                      <div>
+                        <h3 className="font-semibold">{item.title}</h3>
+                        {item.description && (
+                          <p className="text-sm text-muted-foreground">{item.description}</p>
+                        )}
                       </div>
                     </div>
-                    <div>
-                      <div className="text-2xl font-semibold text-accent">
-                        {result.successRate}%
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {reviews.length > 0 && (
+        <section id="testimonials" className="py-20 px-4 bg-gradient-to-b from-white to-slate-50">
+          <div className="container mx-auto">
+            <div className="text-center mb-14">
+              <Badge className="mb-4 gradient-secondary border-0 text-white">Отзывы</Badge>
+              <h2 className="text-3xl lg:text-5xl font-heading font-bold mb-4">
+                Что говорят ученики
+              </h2>
+            </div>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {reviews.map((review) => (
+                <Card key={review.id} className="hover:shadow-xl transition-all">
+                  <CardHeader>
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full gradient-secondary flex items-center justify-center text-white font-bold text-lg">
+                        {review.author_name.charAt(0)}
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        Успешность
+                      <div>
+                        <CardTitle className="text-lg">{review.author_name}</CardTitle>
+                        <div className="flex gap-0.5 mt-1">
+                          {Array.from({ length: review.rating || 5 }).map((_, i) => (
+                            <Icon key={i} name="Star" size={14} className="text-amber-400 fill-amber-400" />
+                          ))}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials Section */}
-      <section id="testimonials" className="py-16 px-4 bg-muted/30">
-        <div className="container mx-auto">
-          <h2 className="text-3xl font-heading font-bold text-center mb-12">
-            Отзывы учеников
-          </h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, index) => (
-              <Card key={index} className="p-6">
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-semibold">{testimonial.name}</h4>
-                    <Badge className="bg-primary">
-                      {testimonial.score}{" "}
-                      {typeof testimonial.score === "number" &&
-                      testimonial.score > 10
-                        ? "баллов"
-                        : ""}
-                    </Badge>
-                  </div>
-                  <p className="text-muted-foreground italic">
-                    "{testimonial.text}"
-                  </p>
-                  <div className="text-sm text-primary font-medium">
-                    {testimonial.subject}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Contacts Section */}
-      <section id="contacts" className="py-16 px-4">
-        <div className="container mx-auto">
-          <h2 className="text-3xl font-heading font-bold text-center mb-12">
-            Контакты
-          </h2>
-          <div className="grid lg:grid-cols-2 gap-12">
-            <div className="space-y-6">
-              <Card className="p-6">
-                <div className="flex items-center space-x-4">
-                  <Icon name="MapPin" size={24} className="text-primary" />
-                  <div>
-                    <h4 className="font-semibold">Адрес</h4>
-                    <p className="text-muted-foreground">
-                      г. Махачкала, ул. Гаджимагомедов, д. 10
-                    </p>
-                  </div>
-                </div>
-              </Card>
-              <Card className="p-6">
-                <div className="flex items-center space-x-4">
-                  <Icon name="Phone" size={24} className="text-primary" />
-                  <div>
-                    <h4 className="font-semibold">Телефон</h4>
-                    <p className="text-muted-foreground">+7 (929) 882-80-30</p>
-                  </div>
-                </div>
-              </Card>
-              <Card className="p-6">
-                <div className="flex items-center space-x-4">
-                  <Icon name="Mail" size={24} className="text-primary" />
-                  <div>
-                    <h4 className="font-semibold">Email</h4>
-                    <p className="text-muted-foreground">
-                      samurcenter@gmail.com
-                    </p>
-                  </div>
-                </div>
-              </Card>
-            </div>
-            <div>
-              <Card className="p-6">
-                <h3 className="text-xl font-semibold mb-6">
-                  Записаться на консультацию
-                </h3>
-                <form className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium">Имя</label>
-                    <input
-                      className="w-full p-3 border rounded-lg mt-1"
-                      placeholder="Ваше имя"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Телефон</label>
-                    <input
-                      className="w-full p-3 border rounded-lg mt-1"
-                      placeholder="+7 (___) ___-__-__"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Предмет</label>
-                    <select className="w-full p-3 border rounded-lg mt-1">
-                      <option>Выберите предмет</option>
-                      <option>Математика</option>
-                      <option>Русский язык</option>
-                      <option>Физика</option>
-                      <option>Химия</option>
-                    </select>
-                  </div>
-                  <Button className="w-full">Отправить заявку</Button>
-                </form>
-              </Card>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-muted-foreground leading-relaxed">{review.review_text}</p>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           </div>
+        </section>
+      )}
+
+      <section id="contacts" className="py-20 px-4">
+        <div className="container mx-auto">
+          <div className="text-center mb-14">
+            <Badge className="mb-4 gradient-accent border-0 text-white">Контакты</Badge>
+            <h2 className="text-3xl lg:text-5xl font-heading font-bold mb-4">
+              Свяжитесь с нами
+            </h2>
+          </div>
+          {contacts.length > 0 ? (
+            <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto mb-12">
+              {contacts.map((contact) => (
+                <Card key={contact.id} className="hover:shadow-lg transition-all text-center">
+                  <CardContent className="p-6">
+                    <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-orange-100 flex items-center justify-center">
+                      <Icon name={contact.icon as any || "Phone"} size={24} className="text-orange-500" />
+                    </div>
+                    <h3 className="font-semibold mb-1">{contact.label || contact.type}</h3>
+                    <p className="text-muted-foreground">{contact.value}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto mb-12">
+              {[
+                { icon: "Phone", label: "Телефон", value: "+7 (999) 123-45-67" },
+                { icon: "Mail", label: "Email", value: "info@samur.ru" },
+                { icon: "MapPin", label: "Адрес", value: "ул. Ленина, 15" },
+              ].map((c) => (
+                <Card key={c.label} className="hover:shadow-lg transition-all text-center">
+                  <CardContent className="p-6">
+                    <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-orange-100 flex items-center justify-center">
+                      <Icon name={c.icon as any} size={24} className="text-orange-500" />
+                    </div>
+                    <h3 className="font-semibold mb-1">{c.label}</h3>
+                    <p className="text-muted-foreground">{c.value}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          <Card className="max-w-2xl mx-auto bg-gradient-to-r from-orange-500 to-amber-500 border-0 text-white shadow-2xl shadow-orange-500/20">
+            <CardContent className="p-10 text-center">
+              <h3 className="text-2xl font-bold mb-3">Готовы начать?</h3>
+              <p className="opacity-90 mb-6">
+                Запишитесь на бесплатное пробное занятие прямо сейчас
+              </p>
+              <Button
+                size="lg"
+                className="bg-white text-orange-600 hover:bg-white/90 text-lg px-8 shadow-lg"
+                onClick={() => openBooking()}
+              >
+                Записаться бесплатно
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="bg-foreground text-background py-12 px-4">
+      <footer className="bg-slate-900 text-white py-12 px-4">
         <div className="container mx-auto">
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-3 gap-8 mb-8">
             <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <Icon name="GraduationCap" size={28} className="text-primary" />
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
+                  <Icon name="GraduationCap" size={22} className="text-white" />
+                </div>
                 <span className="text-xl font-heading font-bold">Samur</span>
               </div>
-              <p className="text-muted-foreground">
-                Ведущий образовательный центр по подготовке к ОГЭ и ЕГЭ.
-                Помогаем достичь высоких результатов уже 8 лет.
+              <p className="text-slate-400 text-sm">
+                Качественная подготовка к ОГЭ и ЕГЭ
               </p>
             </div>
             <div>
-              <h4 className="font-semibold mb-4">Предметы</h4>
-              <ul className="space-y-2 text-muted-foreground">
-                <li>Математика</li>
-                <li>Русский язык</li>
-                <li>Физика</li>
-                <li>Химия</li>
-                <li>Обществознание</li>
+              <h4 className="font-semibold mb-4">Навигация</h4>
+              <ul className="space-y-2 text-sm">
+                {["Главная", "Преподаватели", "Отзывы", "Контакты"].map((item, i) => (
+                  <li key={item}>
+                    <button
+                      onClick={() => scrollToSection(["home", "teachers", "testimonials", "contacts"][i])}
+                      className="text-slate-400 hover:text-white transition-colors"
+                    >
+                      {item}
+                    </button>
+                  </li>
+                ))}
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold mb-4">Контакты</h4>
-              <div className="space-y-2 text-muted-foreground">
-                <p>+7 (966) 746-67-76</p>
-                <p>samurcenter@gmail.com</p>
-                <p>г. Махачкала, ул. Гаджимагомедова, д. 10</p>
-              </div>
+              <h4 className="font-semibold mb-4">Предметы</h4>
+              <ul className="space-y-2 text-sm text-slate-400">
+                {subjects.slice(0, 5).map((s) => (
+                  <li key={s.id}>{s.name}</li>
+                ))}
+              </ul>
             </div>
           </div>
-          <div className="border-t border-muted mt-8 pt-8 text-center text-muted-foreground">
-            <p>&copy; 2024 SAMUR. Все права защищены.</p>
+          <div className="border-t border-slate-800 pt-8 text-center text-sm text-slate-500">
+            <p>&copy; 2025 Samur. Все права защищены.</p>
           </div>
         </div>
       </footer>
 
-      {/* Booking Modal */}
       <Dialog open={bookingOpen} onOpenChange={setBookingOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-heading">
-              Записаться на занятие
-            </DialogTitle>
+            <DialogTitle className="text-xl">Записаться на занятие</DialogTitle>
             <DialogDescription>
-              Выберите преподавателя, предмет и удобное время для занятий
+              Заполните форму и мы свяжемся с вами
             </DialogDescription>
           </DialogHeader>
-
-          <Tabs defaultValue="info" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="info">Информация о занятии</TabsTrigger>
-              <TabsTrigger value="student">Данные ученика</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="info" className="space-y-4">
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="teacher">Преподаватель *</Label>
-                  <Select
-                    value={selectedTeacher}
-                    onValueChange={setSelectedTeacher}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Выберите преподавателя" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {teachers.map((teacher, index) => (
-                        <SelectItem key={index} value={teacher.name}>
-                          {teacher.name} - {teacher.subject}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="subject">Предмет *</Label>
-                  <Select
-                    value={selectedSubject}
-                    onValueChange={setSelectedSubject}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Выберите предмет" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {subjects.map((subject, index) => (
-                        <SelectItem key={index} value={subject.name}>
-                          {subject.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="time">Время занятия *</Label>
-                  <div className="grid grid-cols-3 gap-2 mt-2">
-                    {availableSlots.map((slot, index) => (
-                      <Button
-                        key={index}
-                        variant={
-                          selectedTime === slot.time ? "default" : "outline"
-                        }
-                        disabled={!slot.available}
-                        onClick={() => setSelectedTime(slot.time)}
-                        className="h-12"
-                      >
-                        {slot.time}
-                        {!slot.available && (
-                          <span className="ml-1 text-xs">(занято)</span>
-                        )}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="student" className="space-y-4">
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Имя ученика *</Label>
-                  <Input
-                    id="name"
-                    value={studentName}
-                    onChange={(e) => setStudentName(e.target.value)}
-                    placeholder="Введите имя ученика"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="phone">Телефон *</Label>
-                  <Input
-                    id="phone"
-                    value={studentPhone}
-                    onChange={(e) => setStudentPhone(e.target.value)}
-                    placeholder="+7 (___) ___-__-__"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="email">Email (необязательно)</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={studentEmail}
-                    onChange={(e) => setStudentEmail(e.target.value)}
-                    placeholder="example@mail.ru"
-                  />
-                </div>
-
-                <div className="bg-muted/50 p-4 rounded-lg">
-                  <h4 className="font-semibold mb-2">Выбранные параметры:</h4>
-                  <div className="space-y-1 text-sm">
-                    <p>Преподаватель: {selectedTeacher || "Не выбран"}</p>
-                    <p>Предмет: {selectedSubject || "Не выбран"}</p>
-                    <p>Время: {selectedTime || "Не выбрано"}</p>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-          </Tabs>
-
-          <div className="flex gap-3 mt-6">
-            <Button
-              variant="outline"
-              onClick={() => setBookingOpen(false)}
-              className="flex-1"
-            >
-              Отмена
-            </Button>
-            <Button onClick={handleBooking} className="flex-1">
-              <Icon name="Calendar" size={16} className="mr-2" />
-              Записаться
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-2">
+              <Label>Имя ученика <span className="text-red-500">*</span></Label>
+              <Input value={studentName} onChange={(e) => setStudentName(e.target.value)} placeholder="Имя" />
+            </div>
+            <div className="grid gap-2">
+              <Label>Телефон <span className="text-red-500">*</span></Label>
+              <Input type="tel" value={studentPhone} onChange={(e) => setStudentPhone(e.target.value)} placeholder="+7 (999) 123-45-67" />
+            </div>
+            <div className="grid gap-2">
+              <Label>Email</Label>
+              <Input type="email" value={studentEmail} onChange={(e) => setStudentEmail(e.target.value)} placeholder="email@example.com" />
+            </div>
+            <div className="grid gap-2">
+              <Label>Преподаватель</Label>
+              <Select value={selectedTeacher} onValueChange={setSelectedTeacher}>
+                <SelectTrigger><SelectValue placeholder="Выберите" /></SelectTrigger>
+                <SelectContent>
+                  {teachers.map((t) => (
+                    <SelectItem key={t.id} value={t.full_name}>{t.full_name} — {t.subject}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Предмет</Label>
+              <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+                <SelectTrigger><SelectValue placeholder="Выберите" /></SelectTrigger>
+                <SelectContent>
+                  {subjects.map((s) => (
+                    <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>Удобное время</Label>
+              <Select value={selectedTime} onValueChange={setSelectedTime}>
+                <SelectTrigger><SelectValue placeholder="Выберите" /></SelectTrigger>
+                <SelectContent>
+                  {["9:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"].map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex gap-3 justify-end">
+            <Button variant="outline" onClick={() => setBookingOpen(false)}>Отмена</Button>
+            <Button onClick={handleBooking} disabled={submitting} className="gradient-primary border-0 text-white">
+              {submitting ? "Отправка..." : "Отправить заявку"}
             </Button>
           </div>
         </DialogContent>

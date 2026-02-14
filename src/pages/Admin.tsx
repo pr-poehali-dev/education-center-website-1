@@ -1,173 +1,285 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useToast } from '@/hooks/use-toast';
-import Icon from '@/components/ui/icon';
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import Icon from "@/components/ui/icon";
+import {
+  login,
+  fetchEntity,
+  createEntity,
+  updateEntity,
+  deleteEntity,
+  getToken,
+  setToken,
+  clearToken,
+} from "@/lib/api";
 
-const API_AUTH = 'https://functions.poehali.dev/ac68c96a-4b48-4841-afdd-c45fec1a7ad5';
-const API_DATA = 'https://functions.poehali.dev/a30f8752-d13c-41eb-99b2-d8709193a333';
+type TabKey = "bookings" | "teachers" | "subjects" | "schedule" | "reviews" | "contacts";
 
-interface Teacher {
-  id?: number;
-  name: string;
-  photo_url?: string;
-  description?: string;
-  specialization?: string;
-  experience?: string;
-  sort_order?: number;
+interface EntityItem {
+  id: number;
+  [key: string]: unknown;
 }
 
-interface Schedule {
-  id?: number;
-  time: string;
-  title: string;
-  description?: string;
-  teacher_id?: number;
-  sort_order?: number;
-}
+const TABS: { key: TabKey; label: string; icon: string }[] = [
+  { key: "bookings", label: "Заявки", icon: "Inbox" },
+  { key: "teachers", label: "Преподаватели", icon: "Users" },
+  { key: "subjects", label: "Предметы", icon: "BookOpen" },
+  { key: "schedule", label: "Расписание", icon: "Clock" },
+  { key: "reviews", label: "Отзывы", icon: "Star" },
+  { key: "contacts", label: "Контакты", icon: "Phone" },
+];
 
-interface Contact {
-  id?: number;
-  type: string;
-  value: string;
-  icon?: string;
-  label?: string;
-  sort_order?: number;
-}
+const ENTITY_FIELDS: Record<TabKey, { key: string; label: string; type: string }[]> = {
+  bookings: [
+    { key: "student_name", label: "Имя ученика", type: "text" },
+    { key: "student_phone", label: "Телефон", type: "text" },
+    { key: "student_email", label: "Email", type: "text" },
+    { key: "selected_teacher", label: "Преподаватель", type: "text" },
+    { key: "selected_subject", label: "Предмет", type: "text" },
+    { key: "selected_time", label: "Время", type: "text" },
+    { key: "status", label: "Статус", type: "select:new,in_progress,completed,cancelled" },
+  ],
+  teachers: [
+    { key: "full_name", label: "ФИО", type: "text" },
+    { key: "subject", label: "Предмет", type: "text" },
+    { key: "experience_years", label: "Опыт (лет)", type: "number" },
+    { key: "rating", label: "Рейтинг", type: "number" },
+    { key: "phone", label: "Телефон", type: "text" },
+    { key: "email", label: "Email", type: "text" },
+    { key: "photo_url", label: "URL фото", type: "text" },
+    { key: "description", label: "Описание", type: "textarea" },
+    { key: "sort_order", label: "Порядок", type: "number" },
+  ],
+  subjects: [
+    { key: "name", label: "Название", type: "text" },
+    { key: "exam_type", label: "Тип экзамена", type: "text" },
+  ],
+  schedule: [
+    { key: "time", label: "Время", type: "text" },
+    { key: "title", label: "Название", type: "text" },
+    { key: "description", label: "Описание", type: "textarea" },
+    { key: "sort_order", label: "Порядок", type: "number" },
+  ],
+  reviews: [
+    { key: "author_name", label: "Автор", type: "text" },
+    { key: "rating", label: "Оценка (1-5)", type: "number" },
+    { key: "review_text", label: "Текст отзыва", type: "textarea" },
+    { key: "is_published", label: "Опубликован", type: "select:true,false" },
+    { key: "sort_order", label: "Порядок", type: "number" },
+  ],
+  contacts: [
+    { key: "type", label: "Тип", type: "select:phone,email,address,telegram,whatsapp" },
+    { key: "value", label: "Значение", type: "text" },
+    { key: "icon", label: "Иконка", type: "text" },
+    { key: "label", label: "Название", type: "text" },
+    { key: "sort_order", label: "Порядок", type: "number" },
+  ],
+};
 
-interface Review {
-  id?: number;
-  author_name: string;
-  author_photo?: string;
-  rating?: number;
-  review_text: string;
-  date?: string;
-  is_published?: boolean;
-  sort_order?: number;
-}
+const DISPLAY_FIELDS: Record<TabKey, string[]> = {
+  bookings: ["student_name", "student_phone", "selected_subject", "status", "created_at"],
+  teachers: ["full_name", "subject", "experience_years", "rating"],
+  subjects: ["name", "exam_type"],
+  schedule: ["time", "title"],
+  reviews: ["author_name", "rating", "is_published"],
+  contacts: ["type", "value", "label"],
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  new: "bg-blue-100 text-blue-700",
+  in_progress: "bg-amber-100 text-amber-700",
+  completed: "bg-green-100 text-green-700",
+  cancelled: "bg-red-100 text-red-700",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  new: "Новая",
+  in_progress: "В работе",
+  completed: "Завершена",
+  cancelled: "Отменена",
+};
 
 const Admin = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authToken, setAuthToken] = useState('');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [schedule, setSchedule] = useState<Schedule[]>([]);
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [reviews, setReviews] = useState<Review[]>([]);
+  const [isAuth, setIsAuth] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [activeTab, setActiveTab] = useState<TabKey>("bookings");
+  const [data, setData] = useState<Record<TabKey, EntityItem[]>>({
+    bookings: [],
+    teachers: [],
+    subjects: [],
+    schedule: [],
+    reviews: [],
+    contacts: [],
+  });
+  const [editItem, setEditItem] = useState<Record<string, unknown> | null>(null);
+  const [editIsNew, setEditIsNew] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem('adminToken');
-    if (token) {
-      setAuthToken(token);
-      setIsAuthenticated(true);
-      loadAllData(token);
+    if (getToken()) {
+      setIsAuth(true);
+      loadAll();
     }
   }, []);
 
+  const loadAll = async () => {
+    setLoading(true);
+    const keys: TabKey[] = ["bookings", "teachers", "subjects", "schedule", "reviews", "contacts"];
+    const results: Record<string, EntityItem[]> = {};
+    for (const key of keys) {
+      try {
+        const res = await fetchEntity(key);
+        results[key] = Array.isArray(res) ? res : [];
+      } catch {
+        results[key] = [];
+      }
+    }
+    setData(results as Record<TabKey, EntityItem[]>);
+    setLoading(false);
+  };
+
   const handleLogin = async () => {
     try {
-      const response = await fetch(API_AUTH, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok && data.token) {
-        localStorage.setItem('adminToken', data.token);
-        setAuthToken(data.token);
-        setIsAuthenticated(true);
-        loadAllData(data.token);
-        toast({ title: 'Успешно', description: 'Вы вошли в систему' });
+      const res = await login(username, password);
+      if (res.token) {
+        setToken(res.token);
+        setIsAuth(true);
+        loadAll();
+        toast({ title: "Добро пожаловать!" });
       } else {
-        toast({ title: 'Ошибка', description: 'Неверные данные для входа', variant: 'destructive' });
+        toast({ title: "Неверные данные", variant: "destructive" });
       }
-    } catch (error) {
-      toast({ title: 'Ошибка', description: 'Ошибка при входе', variant: 'destructive' });
+    } catch {
+      toast({ title: "Ошибка входа", variant: "destructive" });
     }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('adminToken');
-    setIsAuthenticated(false);
-    setAuthToken('');
-    navigate('/');
+    clearToken();
+    setIsAuth(false);
+    navigate("/");
   };
 
-  const loadAllData = async (token: string) => {
-    await loadData('teachers', token, setTeachers);
-    await loadData('schedule', token, setSchedule);
-    await loadData('contacts', token, setContacts);
-    await loadData('reviews', token, setReviews);
+  const openNew = () => {
+    const item: Record<string, unknown> = {};
+    ENTITY_FIELDS[activeTab].forEach((f) => {
+      item[f.key] = f.type === "number" ? 0 : "";
+    });
+    setEditItem(item);
+    setEditIsNew(true);
   };
 
-  const loadData = async (entity: string, token: string, setter: any) => {
+  const openEdit = (item: EntityItem) => {
+    setEditItem({ ...item });
+    setEditIsNew(false);
+  };
+
+  const handleSave = async () => {
+    if (!editItem) return;
     try {
-      const response = await fetch(`${API_DATA}?entity=${entity}`, {
-        headers: { 'X-Auth-Token': token }
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setter(Array.isArray(data) ? data : []);
-      }
-    } catch (error) {
-      console.error(`Error loading ${entity}:`, error);
-    }
-  };
-
-  const saveEntity = async (entity: string, data: any, isNew: boolean) => {
-    try {
-      const method = isNew ? 'POST' : 'PUT';
-      const url = isNew ? `${API_DATA}?entity=${entity}` : `${API_DATA}?entity=${entity}&id=${data.id}`;
-      
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Auth-Token': authToken
-        },
-        body: JSON.stringify(data)
-      });
-      
-      if (response.ok) {
-        toast({ title: 'Успешно', description: 'Данные сохранены' });
-        loadAllData(authToken);
+      if (editIsNew) {
+        await createEntity(activeTab, editItem);
+        toast({ title: "Создано" });
       } else {
-        toast({ title: 'Ошибка', description: 'Не удалось сохранить данные', variant: 'destructive' });
+        await updateEntity(activeTab, editItem.id as number, editItem);
+        toast({ title: "Сохранено" });
       }
-    } catch (error) {
-      toast({ title: 'Ошибка', description: 'Ошибка при сохранении', variant: 'destructive' });
+      setEditItem(null);
+      loadAll();
+    } catch {
+      toast({ title: "Ошибка сохранения", variant: "destructive" });
     }
   };
 
-  if (!isAuthenticated) {
+  const handleDelete = async (id: number) => {
+    if (!confirm("Удалить запись?")) return;
+    try {
+      await deleteEntity(activeTab, id);
+      toast({ title: "Удалено" });
+      loadAll();
+    } catch {
+      toast({ title: "Ошибка удаления", variant: "destructive" });
+    }
+  };
+
+  const formatCell = (key: string, value: unknown) => {
+    if (key === "status" && typeof value === "string") {
+      return (
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_COLORS[value] || "bg-gray-100 text-gray-600"}`}>
+          {STATUS_LABELS[value] || value}
+        </span>
+      );
+    }
+    if (key === "is_published") {
+      return value ? (
+        <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Да</span>
+      ) : (
+        <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">Нет</span>
+      );
+    }
+    if (key === "rating" && typeof value === "number") {
+      return (
+        <span className="flex items-center gap-1">
+          <Icon name="Star" size={14} className="text-amber-400 fill-amber-400" />
+          {value}
+        </span>
+      );
+    }
+    if (key === "created_at" && typeof value === "string") {
+      return new Date(value).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    }
+    if (value === null || value === undefined) return "—";
+    return String(value);
+  };
+
+  if (!isAuth) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-2xl text-center">Вход в админ-панель</CardTitle>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
+        <Card className="w-full max-w-sm shadow-2xl">
+          <CardHeader className="text-center pb-2">
+            <div className="w-16 h-16 mx-auto mb-3 rounded-2xl gradient-primary flex items-center justify-center">
+              <Icon name="Shield" size={28} className="text-white" />
+            </div>
+            <CardTitle className="text-2xl">Админ-панель</CardTitle>
+            <p className="text-sm text-muted-foreground">Войдите для управления сайтом</p>
           </CardHeader>
           <CardContent className="space-y-4">
             <Input
               placeholder="Логин"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
             />
             <Input
               type="password"
               placeholder="Пароль"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
             />
-            <Button onClick={handleLogin} className="w-full">
+            <Button onClick={handleLogin} className="w-full gradient-primary border-0 text-white">
               Войти
             </Button>
           </CardContent>
@@ -176,347 +288,204 @@ const Admin = () => {
     );
   }
 
+  const items = data[activeTab] || [];
+  const fields = DISPLAY_FIELDS[activeTab];
+  const tabInfo = TABS.find((t) => t.key === activeTab)!;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 p-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-4xl font-bold">Админ-панель</h1>
-          <Button onClick={handleLogout} variant="outline">
-            <Icon name="LogOut" className="mr-2" size={20} />
-            Выйти
-          </Button>
+    <div className="min-h-screen bg-slate-50 flex">
+      <aside className={`${sidebarOpen ? "w-64" : "w-16"} bg-slate-900 text-white flex flex-col transition-all shrink-0`}>
+        <div className="p-4 flex items-center gap-3 border-b border-slate-700">
+          <div className="w-9 h-9 rounded-xl gradient-primary flex items-center justify-center shrink-0">
+            <Icon name="GraduationCap" size={18} className="text-white" />
+          </div>
+          {sidebarOpen && <span className="font-heading font-bold text-lg">Samur</span>}
         </div>
+        <nav className="flex-1 py-3">
+          {TABS.map((tab) => {
+            const count = data[tab.key]?.length || 0;
+            const isActive = activeTab === tab.key;
+            const isBookingsNew = tab.key === "bookings" && data.bookings.filter((b) => b.status === "new").length > 0;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors ${
+                  isActive ? "bg-white/10 text-white" : "text-slate-400 hover:text-white hover:bg-white/5"
+                }`}
+              >
+                <Icon name={tab.icon as "Inbox"} size={20} />
+                {sidebarOpen && (
+                  <>
+                    <span className="flex-1 text-left">{tab.label}</span>
+                    <span className="flex items-center gap-1">
+                      {isBookingsNew && (
+                        <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                      )}
+                      <span className="text-xs opacity-60">{count}</span>
+                    </span>
+                  </>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+        <div className="p-3 border-t border-slate-700">
+          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="w-full flex items-center gap-3 px-2 py-2 text-sm text-slate-400 hover:text-white">
+            <Icon name={sidebarOpen ? "PanelLeftClose" : "PanelLeftOpen"} size={18} />
+            {sidebarOpen && <span>Свернуть</span>}
+          </button>
+          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-2 py-2 text-sm text-slate-400 hover:text-red-400">
+            <Icon name="LogOut" size={18} />
+            {sidebarOpen && <span>Выйти</span>}
+          </button>
+        </div>
+      </aside>
 
-        <Tabs defaultValue="teachers" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="teachers">Преподаватели</TabsTrigger>
-            <TabsTrigger value="schedule">Расписание</TabsTrigger>
-            <TabsTrigger value="contacts">Контакты</TabsTrigger>
-            <TabsTrigger value="reviews">Отзывы</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="teachers">
-            <TeachersTab teachers={teachers} onSave={(data, isNew) => saveEntity('teachers', data, isNew)} />
-          </TabsContent>
-
-          <TabsContent value="schedule">
-            <ScheduleTab schedule={schedule} onSave={(data, isNew) => saveEntity('schedule', data, isNew)} />
-          </TabsContent>
-
-          <TabsContent value="contacts">
-            <ContactsTab contacts={contacts} onSave={(data, isNew) => saveEntity('contacts', data, isNew)} />
-          </TabsContent>
-
-          <TabsContent value="reviews">
-            <ReviewsTab reviews={reviews} onSave={(data, isNew) => saveEntity('reviews', data, isNew)} />
-          </TabsContent>
-        </Tabs>
-      </div>
-    </div>
-  );
-};
-
-const TeachersTab = ({ teachers, onSave }: { teachers: Teacher[], onSave: (data: Teacher, isNew: boolean) => void }) => {
-  const [editItem, setEditItem] = useState<Teacher | null>(null);
-  
-  const handleEdit = (teacher: Teacher) => {
-    setEditItem({ ...teacher });
-  };
-  
-  const handleNew = () => {
-    setEditItem({ name: '', specialization: '', experience: '', description: '' });
-  };
-  
-  const handleSave = () => {
-    if (editItem) {
-      onSave(editItem, !editItem.id);
-      setEditItem(null);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <Button onClick={handleNew}>
-        <Icon name="Plus" className="mr-2" size={20} />
-        Добавить преподавателя
-      </Button>
-      
-      {editItem && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{editItem.id ? 'Редактировать' : 'Новый преподаватель'}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Input
-              placeholder="Имя"
-              value={editItem.name}
-              onChange={(e) => setEditItem({ ...editItem, name: e.target.value })}
-            />
-            <Input
-              placeholder="URL фото"
-              value={editItem.photo_url || ''}
-              onChange={(e) => setEditItem({ ...editItem, photo_url: e.target.value })}
-            />
-            <Input
-              placeholder="Специализация"
-              value={editItem.specialization || ''}
-              onChange={(e) => setEditItem({ ...editItem, specialization: e.target.value })}
-            />
-            <Input
-              placeholder="Опыт работы"
-              value={editItem.experience || ''}
-              onChange={(e) => setEditItem({ ...editItem, experience: e.target.value })}
-            />
-            <Input
-              placeholder="Описание"
-              value={editItem.description || ''}
-              onChange={(e) => setEditItem({ ...editItem, description: e.target.value })}
-            />
-            <div className="flex gap-2">
-              <Button onClick={handleSave}>Сохранить</Button>
-              <Button variant="outline" onClick={() => setEditItem(null)}>Отмена</Button>
+      <main className="flex-1 p-6 overflow-auto">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-2xl font-bold flex items-center gap-2">
+                <Icon name={tabInfo.icon as "Inbox"} size={24} />
+                {tabInfo.label}
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                {items.length} {items.length === 1 ? "запись" : "записей"}
+              </p>
             </div>
-          </CardContent>
-        </Card>
-      )}
+            {activeTab !== "bookings" && (
+              <Button onClick={openNew} className="gradient-primary border-0 text-white">
+                <Icon name="Plus" size={18} className="mr-2" />
+                Добавить
+              </Button>
+            )}
+          </div>
 
-      <div className="grid gap-4">
-        {teachers.map((teacher) => (
-          <Card key={teacher.id}>
-            <CardContent className="pt-6">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-bold text-lg">{teacher.name}</h3>
-                  <p className="text-sm text-gray-600">{teacher.specialization}</p>
-                  <p className="text-sm text-gray-500">{teacher.experience}</p>
-                </div>
-                <Button size="sm" onClick={() => handleEdit(teacher)}>
-                  <Icon name="Edit" size={16} />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-const ScheduleTab = ({ schedule, onSave }: { schedule: Schedule[], onSave: (data: Schedule, isNew: boolean) => void }) => {
-  const [editItem, setEditItem] = useState<Schedule | null>(null);
-
-  const handleNew = () => {
-    setEditItem({ time: '', title: '', description: '' });
-  };
-
-  const handleSave = () => {
-    if (editItem) {
-      onSave(editItem, !editItem.id);
-      setEditItem(null);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <Button onClick={handleNew}>
-        <Icon name="Plus" className="mr-2" size={20} />
-        Добавить занятие
-      </Button>
-
-      {editItem && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{editItem.id ? 'Редактировать' : 'Новое занятие'}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Input
-              placeholder="Время (например: 09:00 - 10:30)"
-              value={editItem.time}
-              onChange={(e) => setEditItem({ ...editItem, time: e.target.value })}
-            />
-            <Input
-              placeholder="Название"
-              value={editItem.title}
-              onChange={(e) => setEditItem({ ...editItem, title: e.target.value })}
-            />
-            <Input
-              placeholder="Описание"
-              value={editItem.description || ''}
-              onChange={(e) => setEditItem({ ...editItem, description: e.target.value })}
-            />
-            <div className="flex gap-2">
-              <Button onClick={handleSave}>Сохранить</Button>
-              <Button variant="outline" onClick={() => setEditItem(null)}>Отмена</Button>
+          {loading ? (
+            <div className="flex items-center justify-center py-20">
+              <Icon name="Loader2" size={32} className="animate-spin text-muted-foreground" />
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="grid gap-4">
-        {schedule.map((item) => (
-          <Card key={item.id}>
-            <CardContent className="pt-6">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-bold">{item.time}</h3>
-                  <p className="text-lg">{item.title}</p>
-                  <p className="text-sm text-gray-600">{item.description}</p>
-                </div>
-                <Button size="sm" onClick={() => setEditItem({ ...item })}>
-                  <Icon name="Edit" size={16} />
-                </Button>
+          ) : items.length === 0 ? (
+            <Card>
+              <CardContent className="py-16 text-center text-muted-foreground">
+                <Icon name="FolderOpen" size={48} className="mx-auto mb-4 opacity-40" />
+                <p className="text-lg">Нет данных</p>
+                {activeTab !== "bookings" && (
+                  <Button variant="outline" className="mt-4" onClick={openNew}>
+                    Добавить первую запись
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b bg-slate-50">
+                      <th className="text-left text-xs font-medium text-muted-foreground p-3 w-12">ID</th>
+                      {fields.map((f) => (
+                        <th key={f} className="text-left text-xs font-medium text-muted-foreground p-3 uppercase tracking-wide">
+                          {ENTITY_FIELDS[activeTab].find((ef) => ef.key === f)?.label || f}
+                        </th>
+                      ))}
+                      <th className="text-right text-xs font-medium text-muted-foreground p-3 w-24">Действия</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((item) => (
+                      <tr key={item.id} className="border-b last:border-0 hover:bg-slate-50/50 transition-colors">
+                        <td className="p-3 text-sm text-muted-foreground">{item.id}</td>
+                        {fields.map((f) => (
+                          <td key={f} className="p-3 text-sm">{formatCell(f, item[f])}</td>
+                        ))}
+                        <td className="p-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button size="sm" variant="ghost" onClick={() => openEdit(item)}>
+                              <Icon name="Pencil" size={16} />
+                            </Button>
+                            <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700" onClick={() => handleDelete(item.id)}>
+                              <Icon name="Trash2" size={16} />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-};
+            </Card>
+          )}
+        </div>
+      </main>
 
-const ContactsTab = ({ contacts, onSave }: { contacts: Contact[], onSave: (data: Contact, isNew: boolean) => void }) => {
-  const [editItem, setEditItem] = useState<Contact | null>(null);
-
-  const handleNew = () => {
-    setEditItem({ type: 'phone', value: '', label: '' });
-  };
-
-  const handleSave = () => {
-    if (editItem) {
-      onSave(editItem, !editItem.id);
-      setEditItem(null);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <Button onClick={handleNew}>
-        <Icon name="Plus" className="mr-2" size={20} />
-        Добавить контакт
-      </Button>
-
-      {editItem && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{editItem.id ? 'Редактировать' : 'Новый контакт'}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Input
-              placeholder="Тип (phone, email, address)"
-              value={editItem.type}
-              onChange={(e) => setEditItem({ ...editItem, type: e.target.value })}
-            />
-            <Input
-              placeholder="Значение"
-              value={editItem.value}
-              onChange={(e) => setEditItem({ ...editItem, value: e.target.value })}
-            />
-            <Input
-              placeholder="Подпись"
-              value={editItem.label || ''}
-              onChange={(e) => setEditItem({ ...editItem, label: e.target.value })}
-            />
-            <div className="flex gap-2">
-              <Button onClick={handleSave}>Сохранить</Button>
-              <Button variant="outline" onClick={() => setEditItem(null)}>Отмена</Button>
+      <Dialog open={!!editItem} onOpenChange={(open) => !open && setEditItem(null)}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editIsNew ? "Новая запись" : "Редактирование"}</DialogTitle>
+          </DialogHeader>
+          {editItem && (
+            <div className="space-y-4 py-2">
+              {ENTITY_FIELDS[activeTab].map((field) => {
+                const val = editItem[field.key];
+                if (field.type === "textarea") {
+                  return (
+                    <div key={field.key} className="space-y-1">
+                      <label className="text-sm font-medium">{field.label}</label>
+                      <Textarea
+                        value={String(val || "")}
+                        onChange={(e) => setEditItem({ ...editItem, [field.key]: e.target.value })}
+                        rows={3}
+                      />
+                    </div>
+                  );
+                }
+                if (field.type.startsWith("select:")) {
+                  const options = field.type.replace("select:", "").split(",");
+                  return (
+                    <div key={field.key} className="space-y-1">
+                      <label className="text-sm font-medium">{field.label}</label>
+                      <Select
+                        value={String(val || "")}
+                        onValueChange={(v) => setEditItem({ ...editItem, [field.key]: v === "true" ? true : v === "false" ? false : v })}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Выберите" /></SelectTrigger>
+                        <SelectContent>
+                          {options.map((o) => (
+                            <SelectItem key={o} value={o}>
+                              {STATUS_LABELS[o] || (o === "true" ? "Да" : o === "false" ? "Нет" : o)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  );
+                }
+                return (
+                  <div key={field.key} className="space-y-1">
+                    <label className="text-sm font-medium">{field.label}</label>
+                    <Input
+                      type={field.type === "number" ? "number" : "text"}
+                      value={val === null || val === undefined ? "" : String(val)}
+                      onChange={(e) =>
+                        setEditItem({
+                          ...editItem,
+                          [field.key]: field.type === "number" ? Number(e.target.value) : e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                );
+              })}
+              <div className="flex gap-3 pt-2 justify-end">
+                <Button variant="outline" onClick={() => setEditItem(null)}>Отмена</Button>
+                <Button onClick={handleSave} className="gradient-primary border-0 text-white">Сохранить</Button>
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="grid gap-4">
-        {contacts.map((contact) => (
-          <Card key={contact.id}>
-            <CardContent className="pt-6">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-bold">{contact.type}</h3>
-                  <p>{contact.value}</p>
-                  <p className="text-sm text-gray-600">{contact.label}</p>
-                </div>
-                <Button size="sm" onClick={() => setEditItem({ ...contact })}>
-                  <Icon name="Edit" size={16} />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-};
-
-const ReviewsTab = ({ reviews, onSave }: { reviews: Review[], onSave: (data: Review, isNew: boolean) => void }) => {
-  const [editItem, setEditItem] = useState<Review | null>(null);
-
-  const handleNew = () => {
-    setEditItem({ author_name: '', review_text: '', rating: 5, is_published: true });
-  };
-
-  const handleSave = () => {
-    if (editItem) {
-      onSave(editItem, !editItem.id);
-      setEditItem(null);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <Button onClick={handleNew}>
-        <Icon name="Plus" className="mr-2" size={20} />
-        Добавить отзыв
-      </Button>
-
-      {editItem && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{editItem.id ? 'Редактировать' : 'Новый отзыв'}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Input
-              placeholder="Имя автора"
-              value={editItem.author_name}
-              onChange={(e) => setEditItem({ ...editItem, author_name: e.target.value })}
-            />
-            <Input
-              placeholder="Текст отзыва"
-              value={editItem.review_text}
-              onChange={(e) => setEditItem({ ...editItem, review_text: e.target.value })}
-            />
-            <Input
-              type="number"
-              placeholder="Рейтинг (1-5)"
-              value={editItem.rating || 5}
-              onChange={(e) => setEditItem({ ...editItem, rating: parseInt(e.target.value) })}
-              min={1}
-              max={5}
-            />
-            <div className="flex gap-2">
-              <Button onClick={handleSave}>Сохранить</Button>
-              <Button variant="outline" onClick={() => setEditItem(null)}>Отмена</Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="grid gap-4">
-        {reviews.map((review) => (
-          <Card key={review.id}>
-            <CardContent className="pt-6">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-bold">{review.author_name}</h3>
-                  <p className="text-sm">{review.review_text}</p>
-                  <p className="text-sm text-gray-600">Рейтинг: {review.rating}/5</p>
-                </div>
-                <Button size="sm" onClick={() => setEditItem({ ...review })}>
-                  <Icon name="Edit" size={16} />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

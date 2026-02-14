@@ -1,25 +1,43 @@
 {
   "tests": [
     {
-      "name": "Get teachers list",
+      "name": "Get teachers",
       "method": "GET",
       "path": "/?entity=teachers",
       "headers": {
         "X-Auth-Token": "admin_1_shafi"
       },
-      "expectedStatus": 200,
-      "expectedBody": [],
-      "bodyMatcher": "partial"
+      "expectedStatus": 200
     },
     {
-      "name": "Unauthorized access",
+      "name": "Get subjects",
+      "method": "GET",
+      "path": "/?entity=subjects",
+      "headers": {
+        "X-Auth-Token": "admin_1_shafi"
+      },
+      "expectedStatus": 200
+    },
+    {
+      "name": "Get bookings",
+      "method": "GET",
+      "path": "/?entity=bookings",
+      "headers": {
+        "X-Auth-Token": "admin_1_shafi"
+      },
+      "expectedStatus": 200
+    },
+    {
+      "name": "Unauthorized",
       "method": "GET",
       "path": "/?entity=teachers",
-      "expectedStatus": 401,
-      "expectedBody": {
-        "error": "string"
-      },
-      "bodyMatcher": "partial"
+      "expectedStatus": 401
+    },
+    {
+      "name": "CORS",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
     }
   ]
 }

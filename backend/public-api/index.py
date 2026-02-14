@@ -2,120 +2,75 @@ import json
 import os
 import psycopg2
 from decimal import Decimal
-from typing import Dict, Any, List
 
-def get_db_connection():
-    '''Создание подключения к базе данных'''
-    db_url = os.environ.get('DATABASE_URL')
-    conn = psycopg2.connect(db_url)
-    conn.autocommit = False
-    return conn
+SCHEMA = 't_p90313977_education_center_web'
 
-def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    '''
-    Публичный API для получения данных на главную страницу
-    GET /public-api?entity=teachers - получить преподавателей
-    GET /public-api?entity=schedule - получить расписание
-    GET /public-api?entity=contacts - получить контакты
-    GET /public-api?entity=reviews - получить отзывы
-    '''
-    method: str = event.get('httpMethod', 'GET')
-    query_params = event.get('queryStringParameters', {}) or {}
+CORS_HEADERS = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Auth-Token',
+    'Access-Control-Max-Age': '86400'
+}
+
+def serialize(val):
+    if hasattr(val, 'isoformat'):
+        return val.isoformat()
+    if isinstance(val, Decimal):
+        return float(val)
+    return val
+
+def rows_to_dicts(cur):
+    columns = [d[0] for d in cur.description]
+    return [{col: serialize(row[i]) for i, col in enumerate(columns)} for row in cur.fetchall()]
+
+def handler(event, context):
+    '''Публичный API для получения данных на главную страницу — преподаватели, предметы, расписание, отзывы, контакты'''
+    method = event.get('httpMethod', 'GET')
     
     if method == 'OPTIONS':
-        return {
-            'statusCode': 200,
-            'headers': {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type',
-                'Access-Control-Max-Age': '86400'
-            },
-            'body': '',
-            'isBase64Encoded': False
-        }
+        return {'statusCode': 200, 'headers': CORS_HEADERS, 'body': '', 'isBase64Encoded': False}
     
     if method != 'GET':
         return {
             'statusCode': 405,
-            'headers': {
-                'Access-Control-Allow-Origin': '*',
-                'Content-Type': 'application/json'
-            },
+            'headers': {**CORS_HEADERS, 'Content-Type': 'application/json'},
             'body': json.dumps({'error': 'Method not allowed'}),
             'isBase64Encoded': False
         }
     
-    conn = None
-    cur = None
+    qp = event.get('queryStringParameters', {}) or {}
+    entity = qp.get('entity', '')
     
-    try:
-        entity = query_params.get('entity', '')
-        
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        result = get_entities(cur, entity)
-        
-        cur.close()
-        conn.close()
-        
-        return {
-            'statusCode': 200,
-            'headers': {
-                'Access-Control-Allow-Origin': '*',
-                'Content-Type': 'application/json'
-            },
-            'body': json.dumps(result),
-            'isBase64Encoded': False
-        }
-    
-    except Exception as e:
-        if cur:
-            cur.close()
-        if conn:
-            conn.close()
-        return {
-            'statusCode': 500,
-            'headers': {
-                'Access-Control-Allow-Origin': '*',
-                'Content-Type': 'application/json'
-            },
-            'body': json.dumps({'error': str(e)}),
-            'isBase64Encoded': False
-        }
-
-def get_entities(cur, entity: str) -> List[Dict]:
-    '''Получение списка всех сущностей'''
     table_map = {
-        'teachers': 'teachers',
-        'schedule': 'schedule',
-        'contacts': 'contacts',
-        'reviews': 'reviews'
+        'teachers': ('teachers', "SELECT * FROM {schema}.teachers ORDER BY sort_order, id"),
+        'subjects': ('subjects', "SELECT * FROM {schema}.subjects ORDER BY id"),
+        'schedule': ('schedule', "SELECT * FROM {schema}.schedule ORDER BY sort_order, id"),
+        'contacts': ('contacts', "SELECT * FROM {schema}.contacts ORDER BY sort_order, id"),
+        'reviews': ('reviews', "SELECT * FROM {schema}.reviews WHERE is_published = true ORDER BY sort_order, id"),
+        'results': ('results', "SELECT * FROM {schema}.results ORDER BY sort_order, id"),
     }
     
-    table = table_map.get(entity)
-    if not table:
-        raise ValueError(f'Unknown entity: {entity}')
+    if entity not in table_map:
+        return {
+            'statusCode': 400,
+            'headers': {**CORS_HEADERS, 'Content-Type': 'application/json'},
+            'body': json.dumps({'error': f'Unknown entity: {entity}'}),
+            'isBase64Encoded': False
+        }
     
-    if entity == 'teachers':
-        query = f"SELECT * FROM t_p90313977_education_center_web.{table} WHERE name IS NOT NULL ORDER BY id"
-    else:
-        query = f"SELECT * FROM t_p90313977_education_center_web.{table} ORDER BY id"
+    conn = psycopg2.connect(os.environ['DATABASE_URL'])
+    cur = conn.cursor()
+    
+    query = table_map[entity][1].format(schema=SCHEMA)
     cur.execute(query)
-    columns = [desc[0] for desc in cur.description]
-    rows = cur.fetchall()
+    result = rows_to_dicts(cur)
     
-    result = []
-    for row in rows:
-        row_dict = {}
-        for i, col in enumerate(columns):
-            val = row[i]
-            if hasattr(val, 'isoformat'):
-                val = val.isoformat()
-            elif isinstance(val, Decimal):
-                val = float(val)
-            row_dict[col] = val
-        result.append(row_dict)
+    cur.close()
+    conn.close()
     
-    return result
+    return {
+        'statusCode': 200,
+        'headers': {**CORS_HEADERS, 'Content-Type': 'application/json'},
+        'body': json.dumps(result),
+        'isBase64Encoded': False
+    }

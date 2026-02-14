@@ -1,20 +1,28 @@
 {
   "tests": [
     {
-      "name": "Get teachers list",
+      "name": "Get teachers",
       "method": "GET",
       "path": "/?entity=teachers",
-      "expectedStatus": 200,
-      "expectedBody": [],
-      "bodyMatcher": "type"
+      "expectedStatus": 200
     },
     {
-      "name": "Get schedule list",
+      "name": "Get subjects",
+      "method": "GET",
+      "path": "/?entity=subjects",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Get schedule",
       "method": "GET",
       "path": "/?entity=schedule",
-      "expectedStatus": 200,
-      "expectedBody": [],
-      "bodyMatcher": "type"
+      "expectedStatus": 200
+    },
+    {
+      "name": "Unknown entity",
+      "method": "GET",
+      "path": "/?entity=unknown",
+      "expectedStatus": 400
     }
   ]
 }
