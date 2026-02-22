@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +31,7 @@ import {
   clearToken,
 } from "@/lib/api";
 
-type TabKey = "bookings" | "teachers" | "subjects" | "schedule" | "reviews" | "contacts";
+type TabKey = "bookings" | "teachers" | "subjects" | "schedule" | "reviews" | "contacts" | "logs";
 
 interface EntityItem {
   id: number;
@@ -45,9 +45,10 @@ const TABS: { key: TabKey; label: string; icon: string }[] = [
   { key: "schedule", label: "Расписание", icon: "Clock" },
   { key: "reviews", label: "Отзывы", icon: "Star" },
   { key: "contacts", label: "Контакты", icon: "Phone" },
+  { key: "logs", label: "Логи", icon: "Terminal" },
 ];
 
-const ENTITY_FIELDS: Record<TabKey, { key: string; label: string; type: string }[]> = {
+const ENTITY_FIELDS: Partial<Record<TabKey, { key: string; label: string; type: string }[]>> = {
   bookings: [
     { key: "student_name", label: "Имя ученика", type: "text" },
     { key: "student_phone", label: "Телефон", type: "text" },
@@ -94,7 +95,7 @@ const ENTITY_FIELDS: Record<TabKey, { key: string; label: string; type: string }
   ],
 };
 
-const DISPLAY_FIELDS: Record<TabKey, string[]> = {
+const DISPLAY_FIELDS: Partial<Record<TabKey, string[]>> = {
   bookings: ["student_name", "student_phone", "selected_subject", "status", "created_at"],
   teachers: ["full_name", "subject", "experience_years", "rating"],
   subjects: ["name", "exam_type"],
@@ -102,6 +103,13 @@ const DISPLAY_FIELDS: Record<TabKey, string[]> = {
   reviews: ["author_name", "rating", "is_published"],
   contacts: ["type", "value", "label"],
 };
+
+interface LogEntry {
+  id: number;
+  level: "log" | "warn" | "error" | "info";
+  message: string;
+  timestamp: string;
+}
 
 const STATUS_COLORS: Record<string, string> = {
   new: "bg-blue-100 text-blue-700",
@@ -136,6 +144,55 @@ const Admin = () => {
   const [editIsNew, setEditIsNew] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [logFilter, setLogFilter] = useState<"all" | "log" | "warn" | "error">("all");
+  const logIdRef = useRef(0);
+  const logsEndRef = useRef<HTMLDivElement>(null);
+
+  const addLog = useCallback((level: LogEntry["level"], args: unknown[]) => {
+    const message = args
+      .map((a) => {
+        if (a instanceof Error) return `${a.name}: ${a.message}`;
+        if (typeof a === "object") {
+          try { return JSON.stringify(a, null, 2); } catch { return String(a); }
+        }
+        return String(a);
+      })
+      .join(" ");
+    setLogs((prev) => {
+      const next = [...prev, { id: ++logIdRef.current, level, message, timestamp: new Date().toLocaleTimeString("ru-RU") }];
+      return next.slice(-500);
+    });
+  }, []);
+
+  useEffect(() => {
+    const origLog = console.log;
+    const origWarn = console.warn;
+    const origError = console.error;
+    const origInfo = console.info;
+    console.log = (...args) => { origLog(...args); addLog("log", args); };
+    console.warn = (...args) => { origWarn(...args); addLog("warn", args); };
+    console.error = (...args) => { origError(...args); addLog("error", args); };
+    console.info = (...args) => { origInfo(...args); addLog("info", args); };
+    const onError = (e: ErrorEvent) => addLog("error", [`[Uncaught] ${e.message} (${e.filename}:${e.lineno})`]);
+    const onUnhandled = (e: PromiseRejectionEvent) => addLog("error", [`[Promise] ${e.reason}`]);
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onUnhandled);
+    return () => {
+      console.log = origLog;
+      console.warn = origWarn;
+      console.error = origError;
+      console.info = origInfo;
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onUnhandled);
+    };
+  }, [addLog]);
+
+  useEffect(() => {
+    if (activeTab === "logs") {
+      logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [logs, activeTab]);
 
   useEffect(() => {
     if (getToken()) {
@@ -288,8 +345,8 @@ const Admin = () => {
     );
   }
 
-  const items = data[activeTab] || [];
-  const fields = DISPLAY_FIELDS[activeTab];
+  const items = (activeTab !== "logs" ? data[activeTab] : []) as EntityItem[];
+  const fields = DISPLAY_FIELDS[activeTab] || [];
   const tabInfo = TABS.find((t) => t.key === activeTab)!;
 
   return (
@@ -303,9 +360,10 @@ const Admin = () => {
         </div>
         <nav className="flex-1 py-3">
           {TABS.map((tab) => {
-            const count = data[tab.key]?.length || 0;
+            const count = tab.key !== "logs" ? (data[tab.key as Exclude<TabKey, "logs">]?.length || 0) : 0;
             const isActive = activeTab === tab.key;
             const isBookingsNew = tab.key === "bookings" && data.bookings.filter((b) => b.status === "new").length > 0;
+            const errorCount = tab.key === "logs" ? logs.filter((l) => l.level === "error").length : 0;
             return (
               <button
                 key={tab.key}
@@ -322,7 +380,10 @@ const Admin = () => {
                       {isBookingsNew && (
                         <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
                       )}
-                      <span className="text-xs opacity-60">{count}</span>
+                      {errorCount > 0 && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-600 text-white animate-pulse">{errorCount}</span>
+                      )}
+                      {tab.key !== "logs" && <span className="text-xs opacity-60">{count}</span>}
                     </span>
                   </>
                 )}
@@ -350,19 +411,77 @@ const Admin = () => {
                 <Icon name={tabInfo.icon as "Inbox"} size={24} />
                 {tabInfo.label}
               </h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                {items.length} {items.length === 1 ? "запись" : "записей"}
-              </p>
+              {activeTab !== "logs" && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  {items.length} {items.length === 1 ? "запись" : "записей"}
+                </p>
+              )}
+              {activeTab === "logs" && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  {logs.length} записей · перехват console.log / warn / error
+                </p>
+              )}
             </div>
-            {activeTab !== "bookings" && (
+            {activeTab !== "bookings" && activeTab !== "logs" && (
               <Button onClick={openNew} className="gradient-primary border-0 text-white">
                 <Icon name="Plus" size={18} className="mr-2" />
                 Добавить
               </Button>
             )}
+            {activeTab === "logs" && (
+              <div className="flex items-center gap-2">
+                {(["all", "log", "warn", "error"] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setLogFilter(f)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                      logFilter === f
+                        ? f === "error" ? "bg-red-500 text-white" : f === "warn" ? "bg-amber-500 text-white" : "bg-slate-700 text-white"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    {f === "all" ? "Все" : f === "error" ? "Ошибки" : f === "warn" ? "Предупреждения" : "Инфо"}
+                  </button>
+                ))}
+                <Button size="sm" variant="outline" onClick={() => setLogs([])}>
+                  <Icon name="Trash2" size={14} className="mr-1" />
+                  Очистить
+                </Button>
+              </div>
+            )}
           </div>
 
-          {loading ? (
+          {activeTab === "logs" ? (
+            <Card className="bg-slate-950 border-slate-800">
+              <CardContent className="p-0">
+                <div className="h-[calc(100vh-220px)] overflow-y-auto font-mono text-xs">
+                  {logs.filter((l) => logFilter === "all" || l.level === logFilter).length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-slate-500">
+                      <Icon name="Terminal" size={40} className="mb-3 opacity-40" />
+                      <p>Логов пока нет. Взаимодействуй с сайтом — ошибки появятся здесь.</p>
+                    </div>
+                  ) : (
+                    <div className="p-4 space-y-1">
+                      {logs
+                        .filter((l) => logFilter === "all" || l.level === logFilter)
+                        .map((log) => (
+                          <div key={log.id} className={`flex gap-3 py-1 border-b border-slate-900 ${
+                            log.level === "error" ? "text-red-400" : log.level === "warn" ? "text-amber-400" : "text-slate-300"
+                          }`}>
+                            <span className="text-slate-600 shrink-0 w-16">{log.timestamp}</span>
+                            <span className={`shrink-0 w-10 font-bold uppercase text-[10px] pt-[1px] ${
+                              log.level === "error" ? "text-red-500" : log.level === "warn" ? "text-amber-500" : "text-slate-500"
+                            }`}>{log.level}</span>
+                            <span className="whitespace-pre-wrap break-all">{log.message}</span>
+                          </div>
+                        ))}
+                      <div ref={logsEndRef} />
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ) : loading ? (
             <div className="flex items-center justify-center py-20">
               <Icon name="Loader2" size={32} className="animate-spin text-muted-foreground" />
             </div>
@@ -387,7 +506,7 @@ const Admin = () => {
                       <th className="text-left text-xs font-medium text-muted-foreground p-3 w-12">ID</th>
                       {fields.map((f) => (
                         <th key={f} className="text-left text-xs font-medium text-muted-foreground p-3 uppercase tracking-wide">
-                          {ENTITY_FIELDS[activeTab].find((ef) => ef.key === f)?.label || f}
+                          {ENTITY_FIELDS[activeTab]?.find((ef) => ef.key === f)?.label || f}
                         </th>
                       ))}
                       <th className="text-right text-xs font-medium text-muted-foreground p-3 w-24">Действия</th>
@@ -427,7 +546,7 @@ const Admin = () => {
           </DialogHeader>
           {editItem && (
             <div className="space-y-4 py-2">
-              {ENTITY_FIELDS[activeTab].map((field) => {
+              {(ENTITY_FIELDS[activeTab] || []).map((field) => {
                 const val = editItem[field.key];
                 if (field.type === "textarea") {
                   return (
