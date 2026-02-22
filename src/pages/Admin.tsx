@@ -540,7 +540,7 @@ const Admin = () => {
       </main>
 
       <Dialog open={!!editItem} onOpenChange={(open) => !open && setEditItem(null)}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>{editIsNew ? "Новая запись" : "Редактирование"}</DialogTitle>
           </DialogHeader>
