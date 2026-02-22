@@ -154,6 +154,11 @@ def handler(event, context):
             return response(405, {'error': 'Method not allowed'})
 
     except Exception as e:
+        print(f"[ERROR] {method} {entity}: {e}")
+        try:
+            conn.rollback()
+        except Exception:
+            pass
         if cur:
             cur.close()
         if conn:

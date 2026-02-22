@@ -265,8 +265,9 @@ const Admin = () => {
       }
       setEditItem(null);
       loadAll();
-    } catch {
-      toast({ title: "Ошибка сохранения", variant: "destructive" });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Неизвестная ошибка";
+      toast({ title: "Ошибка сохранения", description: msg, variant: "destructive" });
     }
   };
 
@@ -276,8 +277,9 @@ const Admin = () => {
       await deleteEntity(activeTab, id);
       toast({ title: "Удалено" });
       loadAll();
-    } catch {
-      toast({ title: "Ошибка удаления", variant: "destructive" });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Неизвестная ошибка";
+      toast({ title: "Ошибка удаления", description: msg, variant: "destructive" });
     }
   };
 
