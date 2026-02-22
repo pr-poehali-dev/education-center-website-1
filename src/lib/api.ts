@@ -24,7 +24,7 @@ export async function login(username: string, password: string) {
 
 export async function fetchEntity(entity: string) {
   const res = await fetch(`${ADMIN_URL}?entity=${entity}`, {
-    headers: { "X-Auth-Token": getToken() },
+    headers: { "Authorization": getToken() },
   });
   if (!res.ok) throw new Error("Failed to fetch");
   return res.json();
@@ -35,7 +35,7 @@ export async function createEntity(entity: string, data: Record<string, unknown>
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Auth-Token": getToken(),
+      "Authorization": getToken(),
     },
     body: JSON.stringify(data),
   });
@@ -48,7 +48,7 @@ export async function updateEntity(entity: string, id: number, data: Record<stri
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
-      "X-Auth-Token": getToken(),
+      "Authorization": getToken(),
     },
     body: JSON.stringify(data),
   });
@@ -59,7 +59,7 @@ export async function updateEntity(entity: string, id: number, data: Record<stri
 export async function deleteEntity(entity: string, id: number) {
   const res = await fetch(`${ADMIN_URL}?entity=${entity}&id=${id}`, {
     method: "DELETE",
-    headers: { "X-Auth-Token": getToken() },
+    headers: { "Authorization": getToken() },
   });
   if (!res.ok) throw new Error("Failed to delete");
   return res.json();

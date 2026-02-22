@@ -44,7 +44,7 @@ TABLE_MAP = {
 }
 
 def check_auth(headers):
-    token = headers.get('X-Auth-Token', headers.get('x-auth-token', ''))
+    token = headers.get('X-Authorization', headers.get('x-authorization', ''))
     return token.startswith('admin_')
 
 def response(status, body):

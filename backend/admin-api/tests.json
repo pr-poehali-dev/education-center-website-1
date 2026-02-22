@@ -5,7 +5,7 @@
       "method": "GET",
       "path": "/?entity=teachers",
       "headers": {
-        "X-Auth-Token": "admin_1_shafi"
+        "Authorization": "admin_1_shafi"
       },
       "expectedStatus": 200
     },
@@ -14,7 +14,7 @@
       "method": "GET",
       "path": "/?entity=subjects",
       "headers": {
-        "X-Auth-Token": "admin_1_shafi"
+        "Authorization": "admin_1_shafi"
       },
       "expectedStatus": 200
     },
@@ -23,7 +23,7 @@
       "method": "GET",
       "path": "/?entity=bookings",
       "headers": {
-        "X-Auth-Token": "admin_1_shafi"
+        "Authorization": "admin_1_shafi"
       },
       "expectedStatus": 200
     },
