@@ -1,0 +1,2 @@
+ALTER TABLE t_p90313977_education_center_web.subjects
+  DROP CONSTRAINT subjects_exam_type_check;
